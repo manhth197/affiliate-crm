@@ -1,13 +1,34 @@
 /**
- * Types for the Affiliate CRM API, written by hand from `docs/api-contract.md` (v0.1).
- * Will be replaced by types generated with `openapi-typescript` once `docs/openapi.json` exists.
+ * Types for the Affiliate CRM API (contract v0.2).
+ *
+ * - Endpoints already in `docs/openapi.json` use the generated types from `schema.gen.ts`
+ *   (regenerate with `npm run gen:api`), so a change in the API's OpenAPI export breaks the build.
+ * - Everything else is written by hand from `docs/api-contract.md` until the API exports it.
  */
+import type { components } from './schema.gen'
+
+type Schemas = components['schemas']
+
+// ---- Generated from docs/openapi.json ----
+export type Role = Schemas['Role']
+export type UserStatus = Schemas['UserStatus']
+export type AffiliateProfile = Schemas['AffiliateProfile']
+export type Me = Schemas['Me']
+export type User = Omit<Me, 'affiliate'>
+export type LoginRequest = Schemas['LoginRequest']
+export type RegisterRequest = Schemas['RegisterRequest']
+export type ApiErrorBody = Schemas['ErrorResponse']
+export type Health = Schemas['Health']
+/**
+ * Contract v0.2 adds `expiresIn` (seconds until the access token expires); the current
+ * OpenAPI export does not have it yet, so it is optional here.
+ */
+export type TokenPair = Schemas['TokenPair'] & { expiresIn?: number }
+export type AuthResponse = Schemas['AuthResponse'] & { expiresIn?: number }
 
 // ---- Enums ----
-export const ROLES = ['ADMIN', 'STAFF', 'AFFILIATE'] as const
-export type Role = (typeof ROLES)[number]
+export const ROLES = ['ADMIN', 'STAFF', 'AFFILIATE'] as const satisfies readonly Role[]
 
-export type UserStatus = 'ACTIVE' | 'DISABLED'
 export type ProductCategory = 'LOAN' | 'CREDIT_CARD' | 'INSURANCE'
 /** PERCENT value is in basis points (150 = 1.5%); FIXED value is in VND. */
 export type CommissionType = 'PERCENT' | 'FIXED'
@@ -49,33 +70,7 @@ export type Paginated<T> = {
 
 export type PageQuery = { page?: number; pageSize?: number }
 
-export type ApiErrorBody = {
-  statusCode: number
-  error: string
-  message: string
-  details?: { field: string; message: string }[]
-}
-
-// ---- Entities ----
-export type User = {
-  id: string
-  email: string
-  fullName: string
-  phone: string
-  role: Role
-  status: UserStatus
-  createdAt: IsoDateString
-}
-
-export type AffiliateProfile = {
-  userId: string
-  referralCode: string
-  bankName: string | null
-  bankAccountMasked: string | null
-}
-
-export type Me = User & { affiliate?: AffiliateProfile }
-
+// ---- Entities (hand-written) ----
 export type Product = {
   id: string
   name: string
@@ -179,11 +174,8 @@ export type TopAffiliate = {
   commission: number
 }
 
-// ---- Auth ----
-export type LoginRequest = { email: string; password: string }
-export type RegisterRequest = { email: string; password: string; fullName: string; phone: string }
-export type AuthResponse = { user: Me; accessToken: string; refreshToken: string }
-export type TokenPair = { accessToken: string; refreshToken: string }
+/** `GET /staff`: active STAFF and ADMIN users who can be assigned leads. */
+export type StaffMember = { id: string; fullName: string; role: 'STAFF' | 'ADMIN' }
 
 // ---- Request bodies / queries (used from M2 on) ----
 export type LeadQuery = PageQuery & {
