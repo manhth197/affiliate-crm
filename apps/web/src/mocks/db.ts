@@ -6,13 +6,18 @@ export type MockSession = { userId: string; expiresAt: number }
 export type MockDb = SeedData & {
   /** refresh token → session (rotated on every refresh, like the real API). */
   sessions: Record<string, MockSession>
+  /**
+   * The browser's `crm_rt` httpOnly cookie, as the API would see it (contract v0.6). MSW's own
+   * cookie store is off under Node, so the mock keeps this one for browser and tests alike.
+   */
+  refreshCookie: string | null
 }
 
 // Bump the version when the shape changes, so stale saved data is ignored.
-const STORAGE_KEY = 'affiliate-crm.mockDb.v3'
+const STORAGE_KEY = 'affiliate-crm.mockDb.v4'
 
 function freshDb(): MockDb {
-  return { ...createSeed(), sessions: {} }
+  return { ...createSeed(), sessions: {}, refreshCookie: null }
 }
 
 /** The in-memory "database" behind the mock API. Mutated in place by handlers. */

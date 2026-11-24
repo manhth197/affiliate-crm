@@ -13,6 +13,11 @@ export type RequestOptions = {
   query?: Query
   /** Send the bearer token and refresh it on 401. Default: true. */
   auth?: boolean
+  /**
+   * Send and accept cookies cross-origin (`credentials: "include"`). Only the auth endpoints
+   * need it: they set and read the httpOnly refresh cookie (contract v0.6).
+   */
+  withCredentials?: boolean
   signal?: AbortSignal
 }
 
@@ -42,11 +47,12 @@ export function onSessionExpired(listener: () => void) {
 let refreshInFlight: Promise<string | null> | null = null
 
 /**
- * Get a new access token with the stored refresh token.
+ * Get a new access token with the httpOnly refresh cookie.
  * - Single-flight inside the tab: concurrent 401s share one refresh call.
- * - Serialized across tabs with the Web Locks API, and the refresh token is read *inside* the
- *   lock, so two tabs never send the same (rotated, single-use) refresh token.
- * Resolves to null when the session is over (no token, or the API rejected it).
+ * - Serialized across tabs with the Web Locks API: the cookie is shared by all tabs and the
+ *   token in it is single-use, so two parallel refreshes would make the second one fail (401).
+ *   Inside the lock each refresh sends whatever cookie the previous one left.
+ * Resolves to null when the session is over (no session, or the API rejected the cookie).
  */
 export function refreshAccessToken(): Promise<string | null> {
   refreshInFlight ??= withRefreshLock(doRefresh).finally(() => {
@@ -63,15 +69,16 @@ function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function doRefresh(): Promise<string | null> {
-  const refreshToken = tokenStore.getRefreshToken()
-  if (!refreshToken) return null
+  if (!tokenStore.hasSession()) return null
 
-  const response = await send(buildUrl('/auth/refresh'), 'POST', { refreshToken })
+  // Cookie-only refresh: JSON content type + `{}` body (otherwise 415), credentials included.
+  const response = await send(buildUrl('/auth/refresh'), 'POST', {}, null, undefined, true)
   if (response.ok) {
     const tokens = (await response.json()) as TokenPair
     tokenStore.setTokens(tokens)
     return tokens.accessToken
   }
+  // The API also clears the cookie on 401/403.
   if (response.status === 400 || response.status === 401 || response.status === 403) {
     tokenStore.clear()
     expiryListeners.forEach((listener) => listener())
@@ -88,6 +95,7 @@ async function send(
   body: unknown,
   accessToken?: string | null,
   signal?: AbortSignal,
+  withCredentials = false,
 ) {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -98,6 +106,8 @@ async function send(
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
+      // Same-origin requests send cookies anyway; cross-origin ones only with "include".
+      credentials: withCredentials ? 'include' : 'same-origin',
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
@@ -123,22 +133,24 @@ async function parse<T>(response: Response): Promise<T> {
 
 /** Typed fetch wrapper for the CRM API: base URL, JSON, bearer token, refresh-and-retry on 401. */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', query, auth = true, signal } = options
+  const { method = 'GET', query, auth = true, withCredentials = false, signal } = options
   const url = buildUrl(path, query)
   const body = () => (typeof options.body === 'function' ? options.body() : options.body)
+  const sendWith = (token: string | null) =>
+    send(url, method, body(), token, signal, withCredentials)
 
-  if (!auth) return parse<T>(await send(url, method, body(), null, signal))
+  if (!auth) return parse<T>(await sendWith(null))
 
   let token = tokenStore.getAccessToken()
-  // After a page reload only the refresh token is left: get an access token first.
+  // After a page reload only the refresh cookie is left: get an access token first.
   if (!token && tokenStore.hasSession()) token = await refreshAccessToken()
 
-  let response = await send(url, method, body(), token, signal)
+  let response = await sendWith(token)
   if (response.status === 401 && tokenStore.hasSession()) {
     // Another request may already have refreshed while this one was in flight.
     const current = tokenStore.getAccessToken()
     const next = current && current !== token ? current : await refreshAccessToken()
-    if (next) response = await send(url, method, body(), next, signal)
+    if (next) response = await sendWith(next)
   }
   return parse<T>(response)
 }

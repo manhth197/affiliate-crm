@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { db } from '@/mocks/db'
+import { SESSION_HINT_KEY, tokenStore } from '@/api/token-store'
 import { renderApp } from '@/test/render'
 
 describe('LoginPage', () => {
@@ -93,5 +94,33 @@ describe('LoginPage', () => {
 
     expect(await screen.findByRole('heading', { name: /Xin chào/ })).toBeVisible()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('stays logged in after a reload (the cookie restores the session)', async () => {
+    const first = renderApp('/', { as: 'ctv1@demo.vn' })
+    await screen.findByRole('heading', { name: 'Xin chào, Nguyễn Văn An' })
+
+    // "Reload": the page and its in-memory access token are gone; cookie + hint remain.
+    first.unmount()
+    tokenStore.clear()
+    localStorage.setItem(SESSION_HINT_KEY, '1')
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'Xin chào, Nguyễn Văn An' })).toBeVisible()
+  })
+
+  it('is logged out after logout + reload', async () => {
+    const { user, unmount } = renderApp('/', { as: 'ctv1@demo.vn' })
+    await user.click(await screen.findByRole('button', { name: 'Tài khoản' }))
+    await user.click(
+      within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Đăng xuất' }),
+    )
+    await screen.findByRole('heading', { name: 'Đăng nhập' })
+    expect(db.refreshCookie).toBeNull()
+
+    unmount()
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeVisible()
   })
 })

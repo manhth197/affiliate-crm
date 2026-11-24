@@ -63,7 +63,7 @@ describe('connectSocket', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
     refresh.mockReset()
-    tokenStore.setTokens({ accessToken: 'token-1', refreshToken: 'r1', expiresIn: 900 })
+    tokenStore.setTokens({ accessToken: 'token-1', expiresIn: 900 })
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -83,9 +83,9 @@ describe('connectSocket', () => {
     connectSocket()
     await flush()
     // The token ran out: the store no longer hands it out, the server disconnects us.
-    tokenStore.setTokens({ accessToken: 'token-1', refreshToken: 'r1', expiresIn: 0 })
+    tokenStore.setTokens({ accessToken: 'token-1', expiresIn: 0 })
     refresh.mockImplementation(async () => {
-      tokenStore.setTokens({ accessToken: 'token-2', refreshToken: 'r2', expiresIn: 900 })
+      tokenStore.setTokens({ accessToken: 'token-2', expiresIn: 900 })
       return 'token-2'
     })
 

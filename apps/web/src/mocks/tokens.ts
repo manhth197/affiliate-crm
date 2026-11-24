@@ -49,3 +49,41 @@ export function rotateRefreshToken(refreshToken: string, now = Date.now()): Toke
 export function revokeRefreshToken(refreshToken: string) {
   delete db.sessions[refreshToken]
 }
+
+// ---- The refresh cookie (contract v0.6) ----
+const COOKIE_NAME = 'crm_rt'
+const COOKIE_ATTRIBUTES = 'Path=/api/v1/auth; HttpOnly; SameSite=Strict; Max-Age=604800'
+
+/** Whether the browser would attach cookies to this request. */
+function sendsCookies(request: Request) {
+  if (request.credentials === 'include') return true
+  return (
+    request.credentials === 'same-origin' &&
+    typeof location !== 'undefined' &&
+    new URL(request.url).origin === location.origin
+  )
+}
+
+export function readRefreshCookie(request: Request): string | null {
+  return sendsCookies(request) ? db.refreshCookie : null
+}
+
+/** Store the cookie (if the browser would accept it) and return the Set-Cookie header. */
+export function setRefreshCookie(request: Request, refreshToken: string): HeadersInit {
+  if (sendsCookies(request)) db.refreshCookie = refreshToken
+  return { 'Set-Cookie': `${COOKIE_NAME}=${refreshToken}; ${COOKIE_ATTRIBUTES}` }
+}
+
+export function clearRefreshCookie(): HeadersInit {
+  db.refreshCookie = null
+  return {
+    'Set-Cookie': `${COOKIE_NAME}=; Path=/api/v1/auth; HttpOnly; SameSite=Strict; Max-Age=0`,
+  }
+}
+
+/** Tests: a logged-in browser for this user (session + cookie), skipping the login form. */
+export function startMockSession(userId: string): TokenPair {
+  const tokens = issueTokens(userId)
+  db.refreshCookie = tokens.refreshToken
+  return tokens
+}

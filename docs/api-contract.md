@@ -1,9 +1,10 @@
-# Affiliate CRM — API Contract v0.6
+# Affiliate CRM — API Contract v0.7
 
 Source of truth for `apps/api` and `apps/web`. Changes go through the coordinator (see `_dieu-phoi/CONVENTIONS.md`). Once the API runs, `docs/openapi.json` (exported from Swagger) must match this document.
 
 ## Changelog
-- **v0.6 (2026-11-24)**: refresh token also delivered as an httpOnly cookie; `/auth/refresh` and `/auth/logout` accept the cookie; the body `refreshToken` becomes deprecated (removed in v0.7 once the web uses the cookie).
+- **v0.7 (2026-11-24)**: the refresh token travels **only** in the `crm_rt` httpOnly cookie. Responses no longer contain `refreshToken`; `/auth/refresh` and `/auth/logout` take an empty JSON body `{}` (a `refreshToken` property → 400 like any unknown property).
+- v0.6 (2026-11-24): refresh token also delivered as an httpOnly cookie; `/auth/refresh` and `/auth/logout` accept the cookie; the body `refreshToken` becomes deprecated (removed in v0.7 once the web uses the cookie).
 - v0.5 (2026-11-24): `INVALID_PAYOUT_STATUS`; payout generation includes carry-over of late-approved commissions; report scoping rules (`commissionByStatus` is VND totals); `PATCH /auth/me` validation.
 - v0.4 (2026-11-24): error codes `CANNOT_DISABLE_SELF`, `DISBURSED_AMOUNT_REQUIRED`, `INVALID_COMMISSION_STATUS`; commission approve/cancel rules; webhook partner scoping and partner config; socket disconnect on token expiry; notification `data` shapes.
 - v0.3 (2026-11-24): machine-readable `code` on business errors; lead business rules (duplicate open lead, 422 cases, concurrent update, assign rules, CCCD format); `LeadActivity.assignee`; `assignedStaffId=none`; `q` is case- and accent-insensitive; `sort` whitelist; CSV export rules.
@@ -86,10 +87,10 @@ type Notification = { id: string; type: NotificationType; title: string; body: s
 ### Auth
 | Method & path | Who | Body / query | Response |
 |---|---|---|---|
-| `POST /auth/register` | public | `{email, password (≥8), fullName, phone}` | `201 {user: Me, accessToken, refreshToken, expiresIn}` (role AFFILIATE, referral code generated) |
-| `POST /auth/login` | public | `{email, password}` | `200 {user: Me, accessToken, refreshToken, expiresIn}`; wrong credentials → 401; `DISABLED` account → 403 "Account is disabled" |
-| `POST /auth/refresh` | public | `{refreshToken}` | `200 {accessToken, refreshToken, expiresIn}`; invalid/reused token → 401; `DISABLED` account → 403 |
-| `POST /auth/logout` | any | `{refreshToken}` | always `204` (unknown or foreign token is ignored, nothing leaked) |
+| `POST /auth/register` | public | `{email, password (≥8), fullName, phone}` | `201 {user: Me, accessToken, expiresIn}` + `Set-Cookie: crm_rt` (role AFFILIATE, referral code generated) |
+| `POST /auth/login` | public | `{email, password}` | `200 {user: Me, accessToken, expiresIn}` + `Set-Cookie: crm_rt`; wrong credentials → 401; `DISABLED` account → 403 "Account is disabled" |
+| `POST /auth/refresh` | public (cookie) | `{}` | `200 {accessToken, expiresIn}` + rotated `Set-Cookie: crm_rt`; missing/invalid/reused cookie → 401; `DISABLED` account → 403 |
+| `POST /auth/logout` | any | `{}` | always `204`, clears the cookie (unknown or foreign token is ignored, nothing leaked) |
 | `GET /auth/me` | any | – | `200 Me` |
 | `PATCH /auth/me` | any | `{fullName?, phone?, bankName?, bankAccountNumber?}` (bank fields AFFILIATE only, else 403; `bankAccountNumber` 6–20 digits, spaces removed) | `200 Me` (bank account returned only as `bankAccountMasked`, last 4 digits visible) |
 
@@ -97,10 +98,10 @@ type Notification = { id: string; type: NotificationType; title: string; body: s
 
 Refresh token transport (v0.6):
 - `register`, `login` and `refresh` also set the refresh token as a cookie `crm_rt`: `HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800`, plus `Secure` in production (`COOKIE_SECURE=true`).
-- `POST /auth/refresh` and `POST /auth/logout`: the body `refreshToken` is optional; when absent, the API reads the `crm_rt` cookie. `logout` always clears the cookie.
+- `POST /auth/refresh` and `POST /auth/logout` read the token from the `crm_rt` cookie only (v0.7). `logout` always clears the cookie.
 - Cookie-based calls must send `Content-Type: application/json` (forces a CORS preflight; send `{}` as the body) and use `credentials: "include"`. A cookie-only refresh without a JSON content type → 415 (the token is not consumed). CORS allows credentials only for the configured web origins.
 - A failed refresh (401/403) also clears the cookie.
-- Transition: responses still include `refreshToken` in the body (deprecated). After the web switches to the cookie, v0.7 removes it from the body, so JavaScript never sees the refresh token (XSS protection).
+- Since v0.7 the refresh token never appears in a response body, so JavaScript never sees it (XSS protection).
 
 ### Products
 | `GET /products` | any | `?active=true&category=` | `200 Product[]` (affiliates see active only) |

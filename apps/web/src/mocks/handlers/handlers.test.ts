@@ -16,6 +16,7 @@ import type {
 import { previousMonth, vnDay, vnDayRange, vnMonth } from '@/lib/dates'
 import { type DemoEmail, signInAs } from '@/test/render'
 import { db, findUserByEmail } from '../db'
+import { startMockSession } from '../tokens'
 
 const fail = (promise: Promise<unknown>) =>
   promise.then(
@@ -476,5 +477,51 @@ describe('mock API: M4 (notifications, payouts, reports, profile)', () => {
       body: { bankName: 'ACB', bankAccountNumber: '1234 5678 90' },
     })
     expect(me.affiliate).toMatchObject({ bankName: 'ACB', bankAccountMasked: '******7890' })
+  })
+})
+
+describe('mock API: refresh cookie (contract v0.6)', () => {
+  const refresh = (init: RequestInit) =>
+    fetch('http://localhost:3000/api/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      ...init,
+    })
+
+  it('rotates the cookie on refresh and never needs the token in the body', async () => {
+    const user = findUserByEmail('ctv1@demo.vn')!
+    const { refreshToken } = startMockSession(user.id)
+
+    const response = await refresh({ headers: { 'Content-Type': 'application/json' }, body: '{}' })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toMatch(
+      /^crm_rt=.+; Path=\/api\/v1\/auth; HttpOnly; SameSite=Strict/,
+    )
+    expect(db.refreshCookie).not.toBe(refreshToken)
+    expect(db.sessions[refreshToken]).toBeUndefined()
+  })
+
+  it('answers 415 to a cookie-only refresh without JSON, and keeps the token', async () => {
+    const user = findUserByEmail('ctv1@demo.vn')!
+    const { refreshToken } = startMockSession(user.id)
+
+    const response = await refresh({})
+
+    expect(response.status).toBe(415)
+    expect(db.sessions[refreshToken]).toBeDefined()
+    expect(db.refreshCookie).toBe(refreshToken)
+  })
+
+  it('clears the cookie when the refresh fails', async () => {
+    const user = findUserByEmail('ctv1@demo.vn')!
+    const { refreshToken } = startMockSession(user.id)
+    delete db.sessions[refreshToken]
+
+    const response = await refresh({ headers: { 'Content-Type': 'application/json' }, body: '{}' })
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(db.refreshCookie).toBeNull()
   })
 })

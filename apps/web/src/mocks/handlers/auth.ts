@@ -11,7 +11,14 @@ import { toLocalPhone, VN_PHONE_REGEX } from '@/lib/validation'
 import { db, findUserByEmail, findUserById, nextReferralCode, toMe } from '../db'
 import { api, apiError, authenticate, businessError, latency, readJson } from '../http'
 import { rejectUnknownProperties } from '../query'
-import { issueTokens, revokeRefreshToken, rotateRefreshToken } from '../tokens'
+import {
+  clearRefreshCookie,
+  issueTokens,
+  readRefreshCookie,
+  revokeRefreshToken,
+  rotateRefreshToken,
+  setRefreshCookie,
+} from '../tokens'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -58,9 +65,10 @@ export const authHandlers = [
       bankAccountMasked: null,
     })
 
+    const tokens = issueTokens(user.id)
     return HttpResponse.json<AuthResponse>(
-      { user: toMe(user), ...issueTokens(user.id) },
-      { status: 201 },
+      { user: toMe(user), ...tokens },
+      { status: 201, headers: setRefreshCookie(request, tokens.refreshToken) },
     )
   }),
 
@@ -77,23 +85,36 @@ export const authHandlers = [
     if (user.status !== 'ACTIVE') {
       return businessError(403, 'ACCOUNT_DISABLED', 'Account is disabled')
     }
-    return HttpResponse.json<AuthResponse>({ user: toMe(user), ...issueTokens(user.id) })
+    const tokens = issueTokens(user.id)
+    return HttpResponse.json<AuthResponse>(
+      { user: toMe(user), ...tokens },
+      { headers: setRefreshCookie(request, tokens.refreshToken) },
+    )
   }),
 
+  // Contract v0.6: the token comes from the httpOnly cookie (or, deprecated, the body).
   http.post(api('/auth/refresh'), async ({ request }) => {
     await latency()
     const body = await readJson<{ refreshToken: string }>(request)
     const unknown = rejectUnknownProperties(body, ['refreshToken'])
     if (unknown) return unknown
-
-    const session = body.refreshToken ? db.sessions[body.refreshToken] : undefined
-    if (session && findUserById(session.userId)?.status === 'DISABLED') {
-      revokeRefreshToken(body.refreshToken!)
-      return businessError(403, 'ACCOUNT_DISABLED', 'Account is disabled')
+    const isJson = request.headers.get('content-type')?.includes('application/json') ?? false
+    if (!body.refreshToken && !isJson) {
+      // Cookie-only refresh must be JSON (forces a CORS preflight); the token is not consumed.
+      return apiError(415, 'Content-Type must be application/json')
     }
-    const tokens = body.refreshToken ? rotateRefreshToken(body.refreshToken) : null
-    if (!tokens) return apiError(401, 'Invalid refresh token')
-    return HttpResponse.json<TokenPair>(tokens)
+
+    const token = body.refreshToken ?? readRefreshCookie(request)
+    const session = token ? db.sessions[token] : undefined
+    if (session && findUserById(session.userId)?.status === 'DISABLED') {
+      revokeRefreshToken(token!)
+      return businessError(403, 'ACCOUNT_DISABLED', 'Account is disabled', clearRefreshCookie())
+    }
+    const tokens = token ? rotateRefreshToken(token) : null
+    if (!tokens) return apiError(401, 'Invalid refresh token', undefined, clearRefreshCookie())
+    return HttpResponse.json<TokenPair>(tokens, {
+      headers: setRefreshCookie(request, tokens.refreshToken),
+    })
   }),
 
   // Contract v0.2: always 204; an unknown or foreign token is ignored.
@@ -101,11 +122,13 @@ export const authHandlers = [
     await latency()
     const auth = authenticate(request)
     if (auth.error) return auth.error
-    const { refreshToken } = await readJson<{ refreshToken: string }>(request)
+    const body = await readJson<{ refreshToken: string }>(request)
+    const refreshToken = body.refreshToken ?? readRefreshCookie(request)
     if (refreshToken && db.sessions[refreshToken]?.userId === auth.user.id) {
       revokeRefreshToken(refreshToken)
     }
-    return new HttpResponse(null, { status: 204 })
+    // Logout always clears the cookie.
+    return new HttpResponse(null, { status: 204, headers: clearRefreshCookie() })
   }),
 
   http.get(api('/auth/me'), async ({ request }) => {

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { db, findUserByEmail } from '@/mocks/db'
 import { api } from '@/mocks/http'
@@ -46,7 +46,8 @@ describe('Notifications', () => {
     const list = within(await screen.findByRole('list', { name: 'Danh sách thông báo' }))
     await user.click(list.getByRole('button', { name: new RegExp(target.title) }))
 
-    expect(router.state.location.pathname).toBe(`/leads/${target.data.leadId}`)
+    // Lazy route: the URL changes once the page's chunk has loaded.
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/leads/${target.data.leadId}`))
     expect(db.notifications.find((n) => n.id === target.id)?.readAt).not.toBeNull()
   })
 
