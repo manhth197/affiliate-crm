@@ -1,8 +1,9 @@
 // Must load before the class below is defined so its property types are recorded.
 import 'reflect-metadata';
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import { parsePartnerWebhooks } from '../webhooks/partners';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsString,
@@ -78,6 +79,17 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(0)
   COMMISSION_RECONCILE_MINUTES: number = 10;
+
+  /**
+   * Adds Secure to the refresh-token cookie (sent over HTTPS only). Must be
+   * true in production. Parsed explicitly: Boolean("false") would be true.
+   */
+  @Transform(({ obj }: { obj: Record<string, unknown> }) => {
+    const raw = obj.COOKIE_SECURE;
+    return raw === true || raw === 'true';
+  })
+  @IsBoolean()
+  COOKIE_SECURE: boolean = false;
 }
 
 export function validateEnv(

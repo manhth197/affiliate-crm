@@ -31,4 +31,19 @@ describe('validateEnv', () => {
       validateEnv({ ...required, JWT_ACCESS_TTL_SECONDS: '10' }),
     ).toThrow(/JWT_ACCESS_TTL_SECONDS/);
   });
+
+  it.each([
+    [undefined, false],
+    ['false', false],
+    ['true', true],
+    ['1', false],
+  ])(
+    'parses COOKIE_SECURE=%p as %p (not Boolean("false") === true)',
+    (raw, expected) => {
+      const env = validateEnv(
+        raw === undefined ? required : { ...required, COOKIE_SECURE: raw },
+      );
+      expect(env.COOKIE_SECURE).toBe(expected);
+    },
+  );
 });
