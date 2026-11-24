@@ -4190,9 +4190,7 @@
               "REJECTED"
             ],
             "type": "object",
-            "additionalProperties": {
-              "type": "number"
-            },
+            "additionalProperties": false,
             "description": "Number of leads created in [from, to), by current status",
             "properties": {
               "NEW": {
@@ -4223,9 +4221,7 @@
               "CANCELLED"
             ],
             "type": "object",
-            "additionalProperties": {
-              "type": "number"
-            },
+            "additionalProperties": false,
             "description": "Commission amounts in VND (sum) for commissions created in [from, to), by status",
             "properties": {
               "PENDING": {

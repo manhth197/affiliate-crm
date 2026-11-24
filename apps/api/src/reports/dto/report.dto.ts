@@ -39,7 +39,13 @@ function recordOf(
   for (const key of keys) {
     properties[key] = { type: 'integer' };
   }
-  return { type: 'object', description, properties, required: [...keys] };
+  return {
+    type: 'object',
+    description,
+    properties,
+    required: [...keys],
+    additionalProperties: false,
+  };
 }
 
 @ApiSchema({ name: 'LeadsPerDay' })
