@@ -169,7 +169,6 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
-  @ApiCookieAuth('refreshCookie')
   @ApiOperation({
     summary: 'End this session',
     description:
