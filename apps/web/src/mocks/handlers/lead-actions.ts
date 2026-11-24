@@ -11,6 +11,13 @@ import { db, findUserById } from '../db'
 import { api, apiError, authenticate, businessError, latency, readJson } from '../http'
 import { rejectUnknownProperties } from '../query'
 import type { ActivityRecord, LeadRecord } from '../records'
+import {
+  commissionCreatedContent,
+  leadAssignedContent,
+  leadStatusContent,
+} from '../notification-content'
+import { notify } from '../notify'
+import { mockRealtime } from '../realtime'
 import { toActivity, toLead } from '../serialize'
 
 const BACK_OFFICE = ['STAFF', 'ADMIN'] as const
@@ -94,18 +101,28 @@ export const leadActionHandlers = [
       assigneeId: null,
     })
 
-    // Stand-in for the BullMQ job: a PENDING commission right away.
+    // What the API's listeners do after COMMIT: notify the owner, push live updates.
+    notify(lead.affiliateId, leadStatusContent(lead))
+    mockRealtime.emit([`user:${lead.affiliateId}`, 'role:STAFF', 'role:ADMIN'], 'lead:updated', {
+      leadId: lead.id,
+      status: lead.status,
+      updatedAt: lead.updatedAt,
+    })
+
+    // Stand-in for the BullMQ commission job: a PENDING commission right away.
     if (to === 'DISBURSED' && !db.commissions.some((c) => c.leadId === lead.id)) {
       const product = db.products.find((p) => p.id === lead.productId)!
-      db.commissions.push({
+      const commission = {
         id: crypto.randomUUID(),
         leadId: lead.id,
         affiliateId: lead.affiliateId,
         amount: commissionFor(product, amount!),
-        status: 'PENDING',
+        status: 'PENDING' as const,
         payoutId: null,
         createdAt: now,
-      })
+      }
+      db.commissions.push(commission)
+      notify(lead.affiliateId, commissionCreatedContent(commission, lead))
     }
     return HttpResponse.json(toLead(lead, auth.user))
   }),
@@ -142,6 +159,10 @@ export const leadActionHandlers = [
         actorId: auth.user.id,
         assigneeId: assignee.id,
       })
+      if (assignee.id !== auth.user.id) {
+        const product = db.products.find((p) => p.id === lead.productId)
+        notify(assignee.id, leadAssignedContent(lead, product?.name ?? ''))
+      }
     }
     return HttpResponse.json(toLead(lead, auth.user))
   }),

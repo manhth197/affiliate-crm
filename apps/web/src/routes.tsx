@@ -12,8 +12,10 @@ import { PayoutsPage } from '@/features/finance/payouts-page'
 import { LeadCreatePage } from '@/features/leads/lead-create-page'
 import { LeadDetailPage } from '@/features/leads/lead-detail-page'
 import { LeadsRoute } from '@/features/leads/leads-route'
+import { NotificationsPage } from '@/features/notifications/notifications-page'
+import { ProfilePage } from '@/features/profile/profile-page'
+import { ReportsRoute } from '@/features/reports/reports-route'
 import { UsersPage } from '@/features/users/users-page'
-import { PlaceholderPage } from '@/pages/placeholder-page'
 import { RouteErrorPage } from '@/pages/route-error-page'
 
 /**
@@ -50,6 +52,8 @@ export const routes: RouteObject[] = [
                 children: [{ path: 'leads/new', element: <LeadCreatePage /> }],
               },
               { path: 'leads/:leadId', element: <LeadDetailPage /> },
+              { path: 'notifications', element: <NotificationsPage /> },
+              { path: 'profile', element: <ProfilePage /> },
               {
                 element: <RequireRole roles={['ADMIN', 'AFFILIATE']} />,
                 children: [
@@ -66,7 +70,12 @@ export const routes: RouteObject[] = [
               },
               {
                 element: <RequireRole roles={['ADMIN', 'STAFF']} />,
-                children: [{ path: 'reports', element: <PlaceholderPage title="Báo cáo" /> }],
+                children: [
+                  {
+                    path: 'reports',
+                    element: <ReportsRoute />,
+                  },
+                ],
               },
               { path: '*', element: <NotFoundScreen /> },
             ],

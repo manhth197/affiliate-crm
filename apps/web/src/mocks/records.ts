@@ -1,4 +1,10 @@
-import type { CommissionStatus, LeadActivityType, LeadStatus, PayoutStatus } from '@/api/types'
+import type {
+  CommissionStatus,
+  LeadActivityType,
+  LeadStatus,
+  NotificationType,
+  PayoutStatus,
+} from '@/api/types'
 
 /**
  * Rows of the mock database. Like real tables they store foreign keys; the handlers join
@@ -53,5 +59,17 @@ export type PayoutRecord = {
   commissionCount: number
   status: PayoutStatus
   paidAt: string | null
+  createdAt: string
+}
+
+export type NotificationRecord = {
+  id: string
+  /** Recipient. */
+  userId: string
+  type: NotificationType
+  title: string
+  body: string
+  data: Record<string, string>
+  readAt: string | null
   createdAt: string
 }

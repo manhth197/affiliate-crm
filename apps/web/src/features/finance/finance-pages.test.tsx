@@ -20,7 +20,10 @@ describe('CommissionsPage', () => {
     expect(await screen.findByText(new RegExp(`trên ${paid.length} khoản hoa hồng$`))).toBeVisible()
     expect(router.state.location.search).toBe('?status=PAID')
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
-    for (const row of rows) expect(within(row).getByText('Đã thanh toán')).toBeVisible()
+    // Each row shows its status (twice in the DOM: the column, and a copy under the amount
+    // that only phones display).
+    for (const row of rows)
+      expect(within(row).getAllByText('Đã thanh toán').length).toBeGreaterThan(0)
   })
 
   it('shows admins every affiliate with an affiliate column and no personal summary', async () => {

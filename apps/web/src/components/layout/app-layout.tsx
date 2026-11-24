@@ -2,6 +2,8 @@ import { Menu } from 'lucide-react'
 import { useState } from 'react'
 import { Outlet } from 'react-router'
 import { useCurrentUser } from '@/auth/auth-context'
+import { NotificationBell } from '@/features/notifications/notification-bell'
+import { RealtimeBridge } from '@/realtime/realtime-bridge'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -22,6 +24,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-svh bg-muted/40">
+      <RealtimeBridge />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-4">
           <Brand />
@@ -56,7 +59,8 @@ export function AppLayout() {
           <div className="md:hidden">
             <Brand />
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <NotificationBell />
             <UserMenu />
           </div>
         </header>
