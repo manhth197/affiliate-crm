@@ -27,7 +27,13 @@ function setup() {
   const jwt = new JwtService({
     secret: 'unit-test-secret-that-is-long-enough-123',
   });
-  const config = { get: () => 7 } as unknown as ConfigService<AppConfig, true>;
+  const settings: Record<string, number> = {
+    REFRESH_TOKEN_TTL_DAYS: 7,
+    JWT_ACCESS_TTL_SECONDS: 900,
+  };
+  const config = {
+    get: (key: string) => settings[key],
+  } as unknown as ConfigService<AppConfig, true>;
   const service = new TokenService(
     prisma as unknown as PrismaService,
     jwt,
@@ -68,6 +74,7 @@ describe('TokenService', () => {
         before + 7 * DAY_MS,
       );
 
+      expect(pair.expiresIn).toBe(900);
       const payload = await jwt.verifyAsync<JwtPayload>(pair.accessToken);
       expect(payload).toMatchObject({ sub: 'user-1', role: Role.STAFF });
     });

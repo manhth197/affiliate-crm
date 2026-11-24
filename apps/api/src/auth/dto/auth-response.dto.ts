@@ -8,6 +8,9 @@ export class TokenPairDto {
 
   /** Opaque token, valid for 7 days, single use: every refresh returns a new one. */
   refreshToken!: string;
+
+  /** Seconds until the access token expires. @example 900 */
+  expiresIn!: number;
 }
 
 @ApiSchema({ name: 'AuthResponse' })

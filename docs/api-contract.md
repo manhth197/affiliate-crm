@@ -1,9 +1,10 @@
-# Affiliate CRM — API Contract v0.2
+# Affiliate CRM — API Contract v0.3
 
 Source of truth for `apps/api` and `apps/web`. Changes go through the coordinator (see `_dieu-phoi/CONVENTIONS.md`). Once the API runs, `docs/openapi.json` (exported from Swagger) must match this document.
 
 ## Changelog
-- **v0.2 (2026-11-24)**: disabled accounts get 403; logout always 204; unknown body properties → 400; phone/email normalization; `expiresIn` in token responses; refresh tokens are single-use (clients must single-flight refresh); date-range and timezone rules; new `GET /staff`; new `PATCH /auth/me` (planned for M4); decision-record naming.
+- **v0.3 (2026-11-24)**: machine-readable `code` on business errors; lead business rules (duplicate open lead, 422 cases, concurrent update, assign rules, CCCD format); `LeadActivity.assignee`; `assignedStaffId=none`; `q` is case- and accent-insensitive; `sort` whitelist; CSV export rules.
+- v0.2 (2026-11-24): disabled accounts get 403; logout always 204; unknown body properties → 400; phone/email normalization; `expiresIn` in token responses; refresh tokens are single-use (clients must single-flight refresh); date-range and timezone rules; new `GET /staff`; new `PATCH /auth/me` (planned for M4); decision-record naming.
 - v0.1 (2026-11-24): first version.
 
 ## Conventions
@@ -23,6 +24,7 @@ Source of truth for `apps/api` and `apps/web`. Changes go through the coordinato
   { "statusCode": 400, "error": "Bad Request", "message": "Validation failed", "details": [{ "field": "customerPhone", "message": "must be a valid VN phone number" }] }
   ```
   Codes used: 400 validation, 401 not logged in / bad token, 403 wrong role or not owner, 404, 409 conflict (e.g. invalid status transition, duplicate email), 422 business rule, 429 rate limit.
+- Business errors (403 disabled account, 409, 422) also carry a machine-readable `code` so the web can show its own Vietnamese message: `ACCOUNT_DISABLED`, `EMAIL_TAKEN`, `DUPLICATE_LEAD`, `INVALID_TRANSITION`, `CONCURRENT_UPDATE`, `PRODUCT_UNAVAILABLE`, `AMOUNT_NOT_ALLOWED`, `ASSIGNEE_NOT_STAFF`. Example: `{ "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_LEAD", "message": "This customer already has an open lead for this product" }`.
 - Roles: `ADMIN`, `STAFF`, `AFFILIATE`. "Owner" = the affiliate who created the lead.
 
 ## Enums
@@ -61,6 +63,7 @@ type Lead = { id: string; code: string;            // human-friendly, e.g. "LD-0
 type LeadActivity = { id: string; leadId: string; type: "CREATED" | "STATUS_CHANGED" | "ASSIGNED" | "NOTE" | "WEBHOOK";
   fromStatus: LeadStatus | null; toStatus: LeadStatus | null; note: string | null;
   actor: { id: string; fullName: string } | null;    // null when from partner webhook
+  assignee: { id: string; fullName: string } | null; // set on ASSIGNED, else null
   createdAt: string };
 
 type Commission = { id: string; lead: { id: string; code: string; customerName: string };
@@ -104,7 +107,18 @@ type Notification = { id: string; type: NotificationType; title: string; body: s
 | `PATCH /leads/:id/assign` | STAFF, ADMIN | `{staffId}` | `200 Lead` |
 | `POST /leads/:id/notes` | STAFF, ADMIN | `{note}` | `201 LeadActivity` |
 | `GET /leads/:id/activities` | owner, STAFF, ADMIN | – | `200 LeadActivity[]` (newest first; affiliates do not see NOTE entries) |
-| `GET /leads/export.csv` | ADMIN | same filters as `GET /leads` | `200 text/csv` |
+| `GET /leads/export.csv` | ADMIN | same filters as `GET /leads` (page/pageSize ignored) | `200 text/csv` (Vietnamese column headers, times in Vietnam time) |
+
+Lead query rules:
+- `assignedStaffId=none` returns leads nobody has been assigned.
+- `q` matches the customer name (case- and accent-insensitive: "nguyen" matches "Nguyễn"), the lead code (`LD-000123`), or 3+ digits of the phone number.
+- `sort` accepts `createdAt|updatedAt|requestedAmount|disbursedAmount` with `:asc|:desc`; anything else → 400.
+
+Lead business rules:
+- One open lead (`NEW…APPROVED`) per (product, customer phone), across all affiliates. A duplicate → 409 `DUPLICATE_LEAD` with a generic message (it never reveals who owns the other lead). Once the old lead is `REJECTED` or `DISBURSED`, a new one is allowed.
+- Create: unknown or inactive product → 422 `PRODUCT_UNAVAILABLE`; `requestedAmount` on a non-LOAN product → 422 `AMOUNT_NOT_ALLOWED`. `customerNationalId` (CCCD) is 9 or 12 digits.
+- Status change: `disbursedAmount` (integer ≥ 0) is required for `DISBURSED` and rejected (400) for any other status. Invalid step → 409 `INVALID_TRANSITION` (message lists the allowed next steps). Two users changing the same lead at once → the later one gets 409 `CONCURRENT_UPDATE`.
+- Assign: `staffId` must be an ACTIVE STAFF or ADMIN, else 422 `ASSIGNEE_NOT_STAFF`. Re-assigning to the current assignee is a no-op (no activity).
 
 ### Commissions & payouts
 | `GET /commissions` | any | `?status=&affiliateId=&month=YYYY-MM&page=&pageSize=` | `200 Paginated<Commission>` (AFFILIATE: own only) |

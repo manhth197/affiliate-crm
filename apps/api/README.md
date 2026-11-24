@@ -24,7 +24,7 @@ npm run start:dev
 - API: http://localhost:3000/api/v1 (e.g. `GET /api/v1/health`)
 - Swagger UI: http://localhost:3000/api/docs (JSON at `/api/docs-json`)
 
-Demo accounts: `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn` (password `Demo@12345`).
+Demo accounts: `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn` (password `Demo@12345`), plus 6 demo products (fictional partners).
 
 ## Scripts
 
@@ -50,9 +50,12 @@ src/
   prisma/        PrismaService (driver adapter: node-postgres)
   redis/         shared ioredis client
   auth/          register/login/refresh/logout/me, JWT + roles guards, token rotation
-  users/         user lookups, DTOs, mappers, referral codes
+  users/         admin user management, GET /staff, password hashing, referral codes
+  products/      products and commission rules (admin)
+  leads/         leads CRUD/filters/CSV, status machine, the single status-change service, events
+  audit/         append-only audit log (written in the same transaction as the change)
   health/        GET /health (DB + Redis probes)
-  common/        error format, validation helpers, PII masking
+  common/        error format, validation, pagination, dates (Asia/Ho_Chi_Minh), CSV, PII masking
   generated/     Prisma client (generated, not committed)
 prisma/          schema.prisma, migrations/, seed.ts
 test/            e2e tests (supertest) and helpers
@@ -62,5 +65,8 @@ test/            e2e tests (supertest) and helpers
 
 - Every route requires a Bearer token unless marked `@Public()`; restrict by role with `@Roles(...)`.
 - Errors always look like `{ statusCode, error, message, details? }` (see `common/errors`).
+- Affiliates only ever see their own leads, with customer phone/national ID masked.
+- Every lead status change goes through `LeadStatusService` (activity + audit + event).
+- Date filters are half-open `[from, to)` ISO datetimes; months and days use the Vietnam calendar.
 - Money is VND integers (`BIGINT` in the DB). IDs are UUID v7. Timestamps are `timestamptz`.
 - Design decisions: [`docs/decisions`](../../docs/decisions) (files with `api` in the name).
