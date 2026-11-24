@@ -14,7 +14,13 @@ import {
   leadAssignedMessage,
   leadStatusChangedMessage,
   type NotificationMessage,
+  payoutPaidMessage,
 } from './notification-messages';
+import { PayoutStatus } from '../generated/prisma/enums';
+import {
+  PayoutEvents,
+  PayoutStatusChangedEvent,
+} from '../payouts/payout.events';
 import { NotificationsService } from './notifications.service';
 
 /** Turns domain events into queued notifications. */
@@ -40,6 +46,13 @@ export class NotificationsListener {
   @OnEvent(CommissionEvents.Created, { async: true })
   async onCommissionCreated(event: CommissionCreatedEvent): Promise<void> {
     await this.enqueue(commissionCreatedMessage(event));
+  }
+
+  @OnEvent(PayoutEvents.StatusChanged, { async: true })
+  async onPayoutStatusChanged(event: PayoutStatusChangedEvent): Promise<void> {
+    if (event.status === PayoutStatus.PAID) {
+      await this.enqueue(payoutPaidMessage(event));
+    }
   }
 
   /** A notification must never break the request that triggered it. */

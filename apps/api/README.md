@@ -24,7 +24,7 @@ npm run start:dev
 - API: http://localhost:3000/api/v1 (e.g. `GET /api/v1/health`)
 - Swagger UI: http://localhost:3000/api/docs (JSON at `/api/docs-json`)
 
-Demo accounts: `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn` (password `Demo@12345`), plus 6 demo products (fictional partners).
+Demo data (`npm run db:seed`): accounts `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn` (password `Demo@12345`); 6 products (fictional partners); 120 leads over the last 60 days in every status with a realistic timeline (some updates arrive by webhook from "Tài chính An Phát"); commissions for disbursed leads (pending, approved, paid, cancelled); one PAID payout for `ctv1` (last month); a few notifications. The pipeline is generated only when there are no leads yet; `npm run db:reset` drops everything and re-seeds.
 
 ## Scripts
 
@@ -38,6 +38,7 @@ Demo accounts: `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.v
 | `npm run db:migrate -- --name <name>` | Create and apply a new migration (development) |
 | `npm run db:deploy` | Apply pending migrations (CI / production) |
 | `npm run db:seed` | Insert demo data (idempotent) |
+| `npm run db:reset` | **Drop all data**, re-apply migrations, re-seed (local dev only) |
 | `npm run openapi:export` | Write `docs/openapi.json` (no DB or Redis needed) |
 
 ## Layout
@@ -58,11 +59,13 @@ src/
   commissions/   commission job (idempotent), reconcile scheduler, list/summary/approve/cancel
   notifications/ notifications queue + worker, Vietnamese messages, read/unread API
   realtime/      Socket.IO gateway /realtime (JWT handshake, user/role rooms)
+  payouts/       monthly payout job (re-runnable), confirm, mark-paid
+  reports/       overview and top affiliates (SQL aggregates, Vietnam-day buckets)
   webhooks/      partner status webhook: HMAC guard, idempotency by eventId
   health/        GET /health (DB + Redis probes)
   common/        error format, validation, pagination, dates (Asia/Ho_Chi_Minh), CSV, PII masking
   generated/     Prisma client (generated, not committed)
-prisma/          schema.prisma, migrations/, seed.ts
+prisma/          schema.prisma, migrations/, seed.ts + seed-pipeline.ts (deterministic demo data)
 test/            e2e tests (supertest) and helpers
 ```
 
@@ -93,3 +96,7 @@ curl -X POST http://localhost:3000/api/v1/webhooks/partner-status \
   -H 'Content-Type: application/json' -H 'X-Partner-Id: an-phat' \
   -H "X-Timestamp: $TS" -H "X-Signature: $SIG" -d "$BODY"
 ```
+
+## Known issues
+
+- Running the tests prints `DeprecationWarning: Calling client.query() when the client is already executing a query` from `pg`. It comes from inside Prisma 7.10's `@prisma/adapter-pg` (its query interpreter runs sub-queries of one transaction concurrently), not from this code. Harmless with `pg@8`; re-check when upgrading to `pg@9`, which removes that behaviour.

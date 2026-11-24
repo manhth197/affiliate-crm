@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -31,6 +32,7 @@ import { AuthResponseDto, TokenPairDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -116,5 +118,23 @@ export class AuthController {
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   me(@CurrentUser() user: AuthUser): Promise<MeDto> {
     return this.auth.me(user.id);
+  }
+
+  @Patch('me')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update my profile',
+    description:
+      'bankName / bankAccountNumber are for affiliates only (403 otherwise). The account number is only ever returned masked.',
+  })
+  @ApiOkResponse({ type: MeDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  updateMe(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateMeDto,
+  ): Promise<MeDto> {
+    return this.auth.updateMe(user, dto);
   }
 }

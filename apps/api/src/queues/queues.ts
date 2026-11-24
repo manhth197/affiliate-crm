@@ -17,6 +17,17 @@ export const NotificationJob = {
   Send: 'send',
 } as const;
 
+export const PayoutJob = {
+  /** { month, requestedBy } — group APPROVED commissions of a month into DRAFT payouts. */
+  Generate: 'generate',
+} as const;
+
+export interface GeneratePayoutsJobData {
+  /** YYYY-MM (Vietnam calendar) */
+  month: string;
+  requestedBy: string;
+}
+
 export interface CreateCommissionJobData {
   leadId: string;
 }
