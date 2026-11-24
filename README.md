@@ -78,21 +78,24 @@ sequenceDiagram
 Requirements: Docker. From the repo root:
 
 ```bash
-# 1. Start Postgres, Redis, run migrations, start the API (port 3000)
+# 1. Start Postgres, Redis, migrations, the API and the web app
+#    (or put JWT_ACCESS_SECRET=... in a .env file next to docker-compose.yml)
 export JWT_ACCESS_SECRET="$(openssl rand -base64 48)"   # PowerShell: $env:JWT_ACCESS_SECRET = "<32+ random chars>"
 docker compose --profile app up -d --build
 
 # 2. Load demo data (120 leads over 60 days, commissions, a paid payout)
 docker compose --profile app run --rm migrate npx prisma db seed
 
-# 3. Explore: Swagger UI at http://localhost:3000/api/docs
-curl http://localhost:3000/api/v1/health   # {"status":"ok","db":"up","redis":"up"}
+# 3. Open the app at http://localhost:8080 and log in with a demo account below.
+#    The web container's nginx also serves the API on the same origin:
+curl http://localhost:8080/api/v1/health   # {"status":"ok","db":"up","redis":"up"}
+#    Swagger UI: http://localhost:8080/api/docs
 
 # Stop (data is kept in Docker volumes)
 docker compose --profile app down
 ```
 
-Only infrastructure, for local development of the API: `docker compose up -d postgres redis`, then see [apps/api/README.md](apps/api/README.md).
+The API container is also published on `127.0.0.1:3000` (loopback only). Only infrastructure, for local development: `docker compose up -d postgres redis`, then see [apps/api/README.md](apps/api/README.md).
 
 ### Demo accounts
 
@@ -109,12 +112,12 @@ Partner names in the demo data are fictional.
 
 ## API documentation
 
-- Swagger UI: http://localhost:3000/api/docs (raw JSON at `/api/docs-json`)
+- Swagger UI: http://localhost:8080/api/docs with Docker Compose, or http://localhost:3000/api/docs when running the API with `npm run start:dev` (raw JSON at `/api/docs-json`)
 - Committed OpenAPI document: [docs/openapi.json](docs/openapi.json) — the web app generates its TypeScript types from it, and CI fails if it drifts from the code.
 
 ## Tests and CI
 
-- API: 233 unit tests (pure logic) and 137 e2e tests against real Postgres and Redis (HTTP, Socket.IO client, BullMQ workers, signed webhooks); e2e covers ~97% of API source lines.
+- API: 232 unit tests (pure logic) and 136 e2e tests against real Postgres and Redis (HTTP, Socket.IO client, BullMQ workers, signed webhooks); e2e covers ~97% of API source lines.
 - GitHub Actions: [api workflow](.github/workflows/api.yml) — lint, typecheck, unit, e2e with service containers, OpenAPI drift check, Docker image build.
 
 ## Repository layout

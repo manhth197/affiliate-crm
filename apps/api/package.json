@@ -102,6 +102,7 @@
       "!openapi.ts"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "maxWorkers": 3
   }
 }
