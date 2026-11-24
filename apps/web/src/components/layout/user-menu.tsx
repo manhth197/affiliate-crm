@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut } from 'lucide-react'
+import { ChevronsUpDown, LogOut, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useCurrentUser, useAuth } from '@/auth/auth-context'
@@ -53,6 +53,10 @@ export function UserMenu() {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void navigate('/profile')}>
+          <UserRound aria-hidden />
+          Tài khoản của tôi
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={loggingOut} onSelect={() => void handleLogout()}>
           <LogOut aria-hidden />
           Đăng xuất

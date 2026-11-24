@@ -7,7 +7,7 @@ import {
   type ReportsOverview,
   type TopAffiliate,
 } from '@/api/types'
-import { vnDay } from '@/lib/dates'
+import { vnDay, vnDayStart } from '@/lib/dates'
 import { db } from '../db'
 import { api, apiError, authenticate, latency } from '../http'
 import { readQuery, withQueryErrors } from '../query'
@@ -15,12 +15,24 @@ import { readQuery, withQueryErrors } from '../query'
 const DAY = 24 * 60 * 60 * 1000
 const COMMISSION_STATUSES: CommissionStatus[] = ['PENDING', 'APPROVED', 'PAID', 'CANCELLED']
 
-/** [from, to) in epoch ms; defaults to the last 30 days. */
+/**
+ * [from, to) in epoch ms (contract v0.5): defaults to the last 30 Vietnam calendar days
+ * (today included); more than 366 days or from ≥ to is a 400.
+ */
 function readRange(request: Request) {
   const query = readQuery(request)
-  const to = query.datetime('to') ?? Date.now()
+  const tomorrow = Date.parse(
+    vnDayStart(format(addDays(parseISO(vnDay(new Date())), 1), 'yyyy-MM-dd')),
+  )
+  const to = query.datetime('to') ?? tomorrow
   const from = query.datetime('from') ?? to - 30 * DAY
-  return { query, from, to }
+  const invalid =
+    from >= to
+      ? 'from must be before to'
+      : to - from > 366 * DAY
+        ? 'range must not exceed 366 days'
+        : null
+  return { query, from, to, invalid }
 }
 
 const inRange = (iso: string, from: number, to: number) => {
@@ -45,11 +57,8 @@ export const reportHandlers = [
     const auth = authenticate(request, ['STAFF', 'ADMIN'])
     if (auth.error) return auth.error
     return withQueryErrors(() => {
-      const { from, to } = readRange(request)
-      if (from >= to)
-        return apiError(400, 'Validation failed', [
-          { field: 'from', message: 'from must be before to' },
-        ])
+      const { from, to, invalid } = readRange(request)
+      if (invalid) return apiError(400, 'Validation failed', [{ field: 'from', message: invalid }])
 
       const leads = db.leads.filter((l) => inRange(l.createdAt, from, to))
       const leadsByStatus = Object.fromEntries(LEAD_STATUSES.map((s) => [s, 0])) as Record<
@@ -74,7 +83,9 @@ export const reportHandlers = [
 
       return HttpResponse.json<ReportsOverview>({
         leadsByStatus,
-        conversionRate: leads.length ? disbursed.length / leads.length : 0,
+        conversionRate: leads.length
+          ? Math.round((disbursed.length / leads.length) * 1e4) / 1e4
+          : 0,
         disbursedAmount: disbursed.reduce((sum, l) => sum + (l.disbursedAmount ?? 0), 0),
         commissionByStatus,
         leadsPerDay: [...perDay].map(([date, count]) => ({ date, count })),
@@ -87,7 +98,8 @@ export const reportHandlers = [
     const auth = authenticate(request, ['STAFF', 'ADMIN'])
     if (auth.error) return auth.error
     return withQueryErrors(() => {
-      const { query, from, to } = readRange(request)
+      const { query, from, to, invalid } = readRange(request)
+      if (invalid) return apiError(400, 'Validation failed', [{ field: 'from', message: invalid }])
       const limit = Number(query.string('limit') ?? 10)
       if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         return apiError(400, 'Validation failed', [

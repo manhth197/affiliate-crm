@@ -1,5 +1,5 @@
-import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { db, findUserByEmail } from '@/mocks/db'
 import { renderApp } from '@/test/render'
 
@@ -53,21 +53,28 @@ describe('LeadsPage (affiliate)', () => {
   })
 
   it('searches by customer name without typing Vietnamese accents', async () => {
-    const target = ctv1Leads()[0]!
-    const plain = target.customerName
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .toLowerCase()
-    const { user, router } = renderApp('/leads', { as: 'ctv1@demo.vn' })
-    await table()
+    // Fake timers: jump over the 400 ms debounce instead of waiting for it.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true })
+    try {
+      const target = ctv1Leads()[0]!
+      const plain = target.customerName
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase()
+      const { user, router } = renderApp('/leads', { as: 'ctv1@demo.vn' })
+      await table()
 
-    await user.type(screen.getByLabelText('Tìm lead'), plain)
+      await user.type(screen.getByLabelText('Tìm lead'), plain)
+      expect(router.state.location.search).toBe('') // still debouncing
+      await act(() => vi.advanceTimersByTimeAsync(400))
 
-    // Debounced search (400 ms) + request: allow more than the default 1 s under a busy CI.
-    expect(await screen.findByText(target.code, {}, { timeout: 3000 })).toBeVisible()
-    expect(router.state.location.search).toContain('q=')
+      expect(router.state.location.search).toContain('q=')
+      expect(await screen.findByText(target.code)).toBeVisible()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('offers a way back when the page number is past the end', async () => {

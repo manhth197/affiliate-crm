@@ -1,8 +1,10 @@
 import { cn } from 'cn'
 import { Landmark } from 'lucide-react'
+import { Link } from 'react-router'
 import type { PayoutStatus } from '@/api/types'
 import { useCurrentUser } from '@/auth/auth-context'
 import { EmptyState, QueryErrorAlert } from '@/components/feedback'
+import { MonthSelect } from '@/components/month-select'
 import { PageHeader } from '@/components/page-header'
 import { PaginationBar } from '@/components/pagination-bar'
 import { PayoutStatusBadge } from '@/components/status-badge'
@@ -21,6 +23,8 @@ import {
 import { formatDate, formatMonth, formatNumber, formatVnd } from '@/lib/format'
 import { PAYOUT_STATUS_LABELS } from '@/lib/labels'
 import { useUrlState } from '@/lib/use-url-state'
+import { AffiliateSelect } from './affiliate-select'
+import { GeneratePayoutsButton, PayoutActions } from './payout-admin'
 import { usePayouts } from './queries'
 
 const PAGE_SIZE = 20
@@ -29,15 +33,19 @@ const STATUSES = Object.keys(PAYOUT_STATUS_LABELS) as PayoutStatus[]
 export function PayoutsPage() {
   const user = useCurrentUser()
   const isAffiliate = user.role === 'AFFILIATE'
+  const isAdmin = user.role === 'ADMIN'
   const url = useUrlState()
   const status = STATUSES.find((s) => s === url.get('status'))
-  const payouts = usePayouts({ status, page: url.page, pageSize: PAGE_SIZE })
+  const month = /^\d{4}-\d{2}$/.test(url.get('month')) ? url.get('month') : undefined
+  const affiliateId = isAdmin ? url.get('affiliateId') || undefined : undefined
+  const payouts = usePayouts({ status, month, affiliateId, page: url.page, pageSize: PAGE_SIZE })
 
   return (
     <>
       <PageHeader
         title="Chi trả"
         description="Hoa hồng đã duyệt được tổng hợp theo tháng và chuyển khoản cho cộng tác viên."
+        actions={isAdmin && <GeneratePayoutsButton />}
       />
       <div className="space-y-4">
         {user.affiliate && (
@@ -47,24 +55,41 @@ export function PayoutsPage() {
             <AlertDescription>
               {user.affiliate.bankName && user.affiliate.bankAccountMasked
                 ? `${user.affiliate.bankName} · ${user.affiliate.bankAccountMasked}`
-                : 'Bạn chưa có thông tin tài khoản ngân hàng. Vui lòng liên hệ quản trị viên để được chi trả.'}
+                : 'Bạn chưa có thông tin tài khoản ngân hàng. Hãy cập nhật để được chi trả.'}{' '}
+              <Link
+                to="/profile"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Cập nhật
+              </Link>
             </AlertDescription>
           </Alert>
         )}
 
-        <NativeSelect
-          aria-label="Trạng thái"
-          className="w-full sm:w-44"
-          value={status ?? ''}
-          onChange={(event) => url.update({ status: event.target.value })}
-        >
-          <NativeSelectOption value="">Tất cả trạng thái</NativeSelectOption>
-          {STATUSES.map((s) => (
-            <NativeSelectOption key={s} value={s}>
-              {PAYOUT_STATUS_LABELS[s]}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <NativeSelect
+            aria-label="Trạng thái"
+            className="w-full sm:w-44"
+            value={status ?? ''}
+            onChange={(event) => url.update({ status: event.target.value })}
+          >
+            <NativeSelectOption value="">Tất cả trạng thái</NativeSelectOption>
+            {STATUSES.map((s) => (
+              <NativeSelectOption key={s} value={s}>
+                {PAYOUT_STATUS_LABELS[s]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          {isAdmin && (
+            <>
+              <MonthSelect value={month ?? ''} onChange={(value) => url.update({ month: value })} />
+              <AffiliateSelect
+                value={affiliateId ?? ''}
+                onChange={(value) => url.update({ affiliateId: value })}
+              />
+            </>
+          )}
+        </div>
 
         {payouts.isError ? (
           <QueryErrorAlert error={payouts.error} onRetry={() => void payouts.refetch()} />
@@ -79,7 +104,11 @@ export function PayoutsPage() {
             ) : payouts.data.data.length === 0 ? (
               <EmptyState
                 title="Chưa có kỳ chi trả"
-                description="Kỳ chi trả được tạo vào đầu mỗi tháng từ các khoản hoa hồng đã duyệt."
+                description={
+                  isAdmin
+                    ? 'Dùng “Tạo kỳ chi trả” để gom các hoa hồng đã duyệt của một tháng.'
+                    : 'Kỳ chi trả được tạo vào đầu mỗi tháng từ các khoản hoa hồng đã duyệt.'
+                }
               />
             ) : (
               <Table>
@@ -90,7 +119,14 @@ export function PayoutsPage() {
                     <TableHead className="hidden text-right sm:table-cell">Số khoản</TableHead>
                     <TableHead className="text-right">Tổng tiền</TableHead>
                     <TableHead>Trạng thái</TableHead>
-                    <TableHead className="hidden pr-4 sm:table-cell">Ngày thanh toán</TableHead>
+                    <TableHead className={cn('hidden sm:table-cell', !isAdmin && 'pr-4')}>
+                      Ngày thanh toán
+                    </TableHead>
+                    {isAdmin && (
+                      <TableHead className="pr-4 text-right">
+                        <span className="sr-only">Thao tác</span>
+                      </TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -109,9 +145,19 @@ export function PayoutsPage() {
                       <TableCell>
                         <PayoutStatusBadge status={payout.status} />
                       </TableCell>
-                      <TableCell className="hidden pr-4 text-muted-foreground tabular-nums sm:table-cell">
+                      <TableCell
+                        className={cn(
+                          'hidden text-muted-foreground tabular-nums sm:table-cell',
+                          !isAdmin && 'pr-4',
+                        )}
+                      >
                         {payout.paidAt ? formatDate(payout.paidAt) : '—'}
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell className="pr-4 text-right">
+                          <PayoutActions payout={payout} />
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

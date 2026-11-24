@@ -134,6 +134,8 @@ export const authHandlers = [
     }
 
     const phone = body.phone !== undefined ? toLocalPhone(body.phone) : undefined
+    // Contract v0.5: spaces in the account number are ignored.
+    const account = body.bankAccountNumber?.replace(/\s/g, '')
     const details: { field: string; message: string }[] = []
     if (body.fullName !== undefined && !body.fullName.trim()) {
       details.push({ field: 'fullName', message: 'fullName should not be empty' })
@@ -144,7 +146,7 @@ export const authHandlers = [
     if (body.bankName !== undefined && !(body.bankName.trim() && body.bankName.length <= 100)) {
       details.push({ field: 'bankName', message: 'bankName must be 1–100 characters' })
     }
-    if (body.bankAccountNumber !== undefined && !/^\d{6,20}$/.test(body.bankAccountNumber)) {
+    if (account !== undefined && !/^\d{6,20}$/.test(account)) {
       details.push({ field: 'bankAccountNumber', message: 'bankAccountNumber must be 6–20 digits' })
     }
     if (details.length) return apiError(400, 'Validation failed', details)
@@ -154,10 +156,9 @@ export const authHandlers = [
     if (phone !== undefined) user.phone = phone
     const profile = db.affiliates.find((a) => a.userId === user.id)
     if (profile && body.bankName !== undefined) profile.bankName = body.bankName.trim()
-    if (profile && body.bankAccountNumber !== undefined) {
+    if (profile && account !== undefined) {
       // Only the last 4 digits are ever returned.
-      const digits = body.bankAccountNumber
-      profile.bankAccountMasked = `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`
+      profile.bankAccountMasked = `${'*'.repeat(account.length - 4)}${account.slice(-4)}`
     }
     return HttpResponse.json(toMe(user))
   }),

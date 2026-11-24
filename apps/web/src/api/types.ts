@@ -1,11 +1,11 @@
 /**
- * Types for the Affiliate CRM API (contract v0.4).
+ * Types for the Affiliate CRM API (contract v0.5).
  *
  * - Everything the API already exports in `docs/openapi.json` comes from the generated
  *   `schema.gen.ts` (regenerate with `npm run gen:api`), so a change in the API breaks our build
  *   instead of production.
- * - The rest (payouts, reports) is written by hand from `docs/api-contract.md` until the API
- *   exports it.
+ * - Only query-string and realtime types are written by hand (OpenAPI does not describe
+ *   query objects as schemas, nor Socket.IO events).
  */
 import type { components } from './schema.gen'
 
@@ -48,6 +48,16 @@ export type Commission = Schemas['Commission']
 export type CommissionSummary = Schemas['CommissionSummary']
 export type CancelCommissionRequest = Schemas['CancelCommissionRequest']
 
+export type PayoutStatus = Schemas['PayoutStatus']
+export type Payout = Schemas['Payout']
+export type GeneratePayoutsRequest = Schemas['GeneratePayoutsRequest']
+export type JobAccepted = Schemas['JobAccepted']
+
+export type ReportsOverview = Schemas['ReportOverview']
+export type TopAffiliate = Schemas['TopAffiliate']
+
+export type UpdateMeRequest = Schemas['UpdateMeRequest']
+
 export type NotificationType = Schemas['NotificationType']
 export type Notification = Schemas['Notification']
 export type NotificationPage = Schemas['PaginatedNotifications']
@@ -62,8 +72,6 @@ export const LEAD_STATUSES = [
   'DISBURSED',
   'REJECTED',
 ] as const satisfies readonly LeadStatus[]
-
-export type PayoutStatus = 'DRAFT' | 'CONFIRMED' | 'PAID'
 
 /** Allowed lead transitions (anything else is a 409 INVALID_TRANSITION from the API). */
 export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
@@ -82,44 +90,6 @@ export type IsoDateString = string
 export type Paginated<T> = { data: T[]; meta: Schemas['PageMeta'] }
 
 export type PageQuery = { page?: number; pageSize?: number }
-
-// ---- Hand-written (not in the OpenAPI export yet) ----
-export type Payout = {
-  id: string
-  affiliate: UserRef
-  /** "YYYY-MM" */
-  periodMonth: string
-  totalAmount: number
-  commissionCount: number
-  status: PayoutStatus
-  paidAt: IsoDateString | null
-  createdAt: IsoDateString
-}
-
-export type ReportsOverview = {
-  leadsByStatus: Record<LeadStatus, number>
-  /** DISBURSED ÷ all, 0..1 */
-  conversionRate: number
-  disbursedAmount: number
-  commissionByStatus: Record<CommissionStatus, number>
-  leadsPerDay: { date: string; count: number }[]
-}
-
-export type TopAffiliate = {
-  affiliate: { id: string; fullName: string; referralCode: string }
-  leads: number
-  disbursed: number
-  commission: number
-}
-
-/** `PATCH /auth/me` (contract v0.4, API in M4). Bank fields: AFFILIATE only. */
-export type UpdateMeRequest = {
-  fullName?: string
-  phone?: string
-  bankName?: string
-  /** Write-only: the API returns it only as `affiliate.bankAccountMasked`. */
-  bankAccountNumber?: string
-}
 
 // ---- Query strings ----
 export type LeadSortField = 'createdAt' | 'updatedAt' | 'requestedAmount' | 'disbursedAmount'

@@ -6,6 +6,7 @@ import { AppProviders } from '@/app-providers'
 import { createQueryClient } from '@/lib/query-client'
 import { findUserByEmail } from '@/mocks/db'
 import { issueTokens } from '@/mocks/tokens'
+import { connectMock } from '@/realtime/mock-connection'
 import { routes } from '@/routes'
 
 export type DemoEmail =
@@ -26,7 +27,7 @@ export function renderApp(route = '/', { as }: { as?: DemoEmail } = {}) {
   const router = createMemoryRouter(routes, { initialEntries: [route] })
   const user = userEvent.setup()
   const result = render(
-    <AppProviders queryClient={queryClient}>
+    <AppProviders queryClient={queryClient} connectRealtime={connectMock}>
       <RouterProvider router={router} />
     </AppProviders>,
   )

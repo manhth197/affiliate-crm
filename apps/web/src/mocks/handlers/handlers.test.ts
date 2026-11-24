@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/api/client'
 import type { ApiError } from '@/api/errors'
 import type {
@@ -6,11 +6,14 @@ import type {
   CommissionSummary,
   Lead,
   LeadActivity,
+  Me,
+  NotificationPage,
   Paginated,
   Product,
+  ReportsOverview,
   StaffMember,
 } from '@/api/types'
-import { vnDayRange, vnDay } from '@/lib/dates'
+import { previousMonth, vnDay, vnDayRange, vnMonth } from '@/lib/dates'
 import { type DemoEmail, signInAs } from '@/test/render'
 import { db, findUserByEmail } from '../db'
 
@@ -388,5 +391,90 @@ describe('mock API: pipeline actions (M3)', () => {
       apiRequest(`/users/${admin.id}`, { method: 'PATCH', body: { status: 'DISABLED' } }),
     )
     expect(error).toMatchObject({ status: 422, code: 'CANNOT_DISABLE_SELF' })
+  })
+})
+
+describe('mock API: M4 (notifications, payouts, reports, profile)', () => {
+  it('lists only my notifications with the unread count, and read-all clears it', async () => {
+    const me = signInAs('ctv1@demo.vn')
+    const page = await apiRequest<NotificationPage>('/notifications', { query: { pageSize: 100 } })
+    const mine = db.notifications.filter((n) => n.userId === me.id)
+    expect(page.meta.total).toBe(mine.length)
+    expect(page.unreadCount).toBe(mine.filter((n) => !n.readAt).length)
+
+    const someoneElses = db.notifications.find((n) => n.userId !== me.id)!
+    expect(
+      (await fail(apiRequest(`/notifications/${someoneElses.id}/read`, { method: 'PATCH' })))
+        .status,
+    ).toBe(404)
+
+    await apiRequest('/notifications/read-all', { method: 'PATCH' })
+    const after = await apiRequest<NotificationPage>('/notifications', { query: { unread: true } })
+    expect(after).toMatchObject({ unreadCount: 0, meta: { total: 0 } })
+  })
+
+  it('generates payouts with late approvals, recalculates drafts and never touches paid ones', async () => {
+    signInAs('admin@demo.vn')
+    const month = previousMonth(vnMonth(new Date()))
+    const late = db.commissions.find(
+      (c) => c.status === 'APPROVED' && !c.payoutId && vnMonth(c.createdAt) < month,
+    )
+    await apiRequest('/payouts/generate', { method: 'POST', body: { month } })
+    await vi.waitFor(() =>
+      expect(db.payouts.some((p) => p.periodMonth === month && p.status === 'DRAFT')).toBe(true),
+    )
+    if (late) expect(db.commissions.find((c) => c.id === late.id)?.payoutId).not.toBeNull()
+
+    // Approve one more commission, run again: the DRAFT grows, no second payout appears.
+    const draft = db.payouts.find((p) => p.periodMonth === month && p.status === 'DRAFT')!
+    const before = { count: draft.commissionCount, payouts: db.payouts.length }
+    const extra = db.commissions.find(
+      (c) =>
+        c.affiliateId === draft.affiliateId &&
+        c.status === 'PENDING' &&
+        vnMonth(c.createdAt) <= month,
+    )
+    if (extra) await apiRequest(`/commissions/${extra.id}/approve`, { method: 'PATCH' })
+    await apiRequest('/payouts/generate', { method: 'POST', body: { month } })
+    await vi.waitFor(() => expect(draft.commissionCount).toBe(before.count + (extra ? 1 : 0)))
+    expect(db.payouts.length).toBe(before.payouts)
+
+    const paid = db.payouts.find((p) => p.status === 'PAID')!
+    expect(
+      await fail(apiRequest(`/payouts/${paid.id}/confirm`, { method: 'PATCH' })),
+    ).toMatchObject({
+      status: 409,
+      code: 'INVALID_PAYOUT_STATUS',
+    })
+  })
+
+  it('reports the last 30 days by default and refuses ranges over 366 days', async () => {
+    signInAs('staff@demo.vn')
+    const overview = await apiRequest<ReportsOverview>('/reports/overview')
+    expect(overview.leadsPerDay).toHaveLength(30)
+    const error = await fail(
+      apiRequest('/reports/overview', {
+        query: { from: '2025-01-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' },
+      }),
+    )
+    expect(error.status).toBe(400)
+
+    signInAs('ctv1@demo.vn')
+    expect((await fail(apiRequest('/reports/overview'))).status).toBe(403)
+  })
+
+  it('keeps bank details for affiliates only and masks the account number', async () => {
+    signInAs('staff@demo.vn')
+    const forbidden = await fail(
+      apiRequest('/auth/me', { method: 'PATCH', body: { bankName: 'ACB' } }),
+    )
+    expect(forbidden.status).toBe(403)
+
+    signInAs('ctv3@demo.vn')
+    const me = await apiRequest<Me>('/auth/me', {
+      method: 'PATCH',
+      body: { bankName: 'ACB', bankAccountNumber: '1234 5678 90' },
+    })
+    expect(me.affiliate).toMatchObject({ bankName: 'ACB', bankAccountMasked: '******7890' })
   })
 })

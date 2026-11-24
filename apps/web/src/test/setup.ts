@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
+import { toast } from 'sonner'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { tokenStore } from '@/api/token-store'
 import { resetDb } from '@/mocks/db'
@@ -34,6 +35,8 @@ Element.prototype.releasePointerCapture ??= () => {}
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => {
   cleanup()
+  // sonner keeps toasts in a module-level store; without this they leak into the next test.
+  toast.dismiss()
   server.resetHandlers()
   server.events.removeAllListeners()
   tokenStore.clear()

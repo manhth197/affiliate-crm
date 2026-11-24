@@ -25,7 +25,11 @@ function payoutChanged(payout: PayoutRecord) {
   })
 }
 
-/** What POST /payouts/generate's job does: one DRAFT payout per affiliate for the month. */
+/**
+ * What POST /payouts/generate's job does (contract v0.5): per affiliate, take every APPROVED
+ * commission not yet in a payout and created before the end of `month` (late approvals roll
+ * over). A DRAFT payout for that month is recalculated; CONFIRMED/PAID ones are never touched.
+ */
 function runGeneratePayoutsJob(month: string) {
   const byAffiliate = new Map<string, typeof db.commissions>()
   for (const c of db.commissions) {
@@ -33,20 +37,25 @@ function runGeneratePayoutsJob(month: string) {
     byAffiliate.set(c.affiliateId, [...(byAffiliate.get(c.affiliateId) ?? []), c])
   }
   for (const [affiliateId, commissions] of byAffiliate) {
-    // Idempotent: a second run for the same month does not create a second payout.
-    if (db.payouts.some((p) => p.affiliateId === affiliateId && p.periodMonth === month)) continue
-    const payout: PayoutRecord = {
+    const existing = db.payouts.find(
+      (p) => p.affiliateId === affiliateId && p.periodMonth === month,
+    )
+    if (existing && existing.status !== 'DRAFT') continue
+    const payout: PayoutRecord = existing ?? {
       id: crypto.randomUUID(),
       affiliateId,
       periodMonth: month,
-      totalAmount: commissions.reduce((sum, c) => sum + c.amount, 0),
-      commissionCount: commissions.length,
+      totalAmount: 0,
+      commissionCount: 0,
       status: 'DRAFT',
       paidAt: null,
       createdAt: new Date().toISOString(),
     }
-    db.payouts.push(payout)
+    if (!existing) db.payouts.push(payout)
     commissions.forEach((c) => (c.payoutId = payout.id))
+    const included = db.commissions.filter((c) => c.payoutId === payout.id)
+    payout.totalAmount = included.reduce((sum, c) => sum + c.amount, 0)
+    payout.commissionCount = included.length
     payoutChanged(payout)
   }
   persistDb()
@@ -201,7 +210,9 @@ export const financeHandlers = [
     if (auth.error) return auth.error
     const payout = db.payouts.find((p) => p.id === params.id)
     if (!payout) return apiError(404, 'Payout not found')
-    if (payout.status !== 'DRAFT') return apiError(409, 'Only DRAFT payouts can be confirmed')
+    if (payout.status !== 'DRAFT') {
+      return businessError(409, 'INVALID_PAYOUT_STATUS', 'Only DRAFT payouts can be confirmed')
+    }
     payout.status = 'CONFIRMED'
     payoutChanged(payout)
     return HttpResponse.json(toPayout(payout))
