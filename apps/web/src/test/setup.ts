@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest'
 import { tokenStore } from '@/api/token-store'
 import { resetDb } from '@/mocks/db'
 import { server } from '@/mocks/node'
+import { mockRealtime } from '@/mocks/realtime'
 
 // ---- jsdom gaps that Radix UI / sonner rely on ----
 class ResizeObserverStub {
@@ -38,5 +39,6 @@ afterEach(() => {
   tokenStore.clear()
   localStorage.clear()
   resetDb()
+  mockRealtime.reset()
 })
 afterAll(() => server.close())

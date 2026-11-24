@@ -112,6 +112,15 @@ export type TopAffiliate = {
   commission: number
 }
 
+/** `PATCH /auth/me` (contract v0.4, API in M4). Bank fields: AFFILIATE only. */
+export type UpdateMeRequest = {
+  fullName?: string
+  phone?: string
+  bankName?: string
+  /** Write-only: the API returns it only as `affiliate.bankAccountMasked`. */
+  bankAccountNumber?: string
+}
+
 // ---- Query strings ----
 export type LeadSortField = 'createdAt' | 'updatedAt' | 'requestedAmount' | 'disbursedAmount'
 

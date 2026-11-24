@@ -7,6 +7,8 @@ import { catalogHandlers } from './catalog'
 import { financeHandlers } from './finance'
 import { leadActionHandlers } from './lead-actions'
 import { leadHandlers } from './leads'
+import { notificationHandlers } from './notifications'
+import { reportHandlers } from './reports'
 
 export const handlers = [
   ...authHandlers,
@@ -15,6 +17,8 @@ export const handlers = [
   ...leadActionHandlers,
   ...adminHandlers,
   ...financeHandlers,
+  ...notificationHandlers,
+  ...reportHandlers,
   http.get(api('/health'), () =>
     HttpResponse.json<Health>({ status: 'ok', db: 'up', redis: 'up' }),
   ),

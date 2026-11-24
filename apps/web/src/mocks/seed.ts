@@ -1,5 +1,7 @@
 import type { AffiliateProfile, Product, User } from '@/api/types'
+import type { NotificationRecord } from './records'
 import { createLeadSeed, type LeadSeed } from './seed-leads'
+import { createNotificationSeed } from './seed-notifications'
 
 /**
  * Demo data matching the "Seed data" section of docs/api-contract.md.
@@ -12,6 +14,7 @@ const daysAgo = (days: number, now: number) => new Date(now - days * DAY).toISOS
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 
 export type SeedData = LeadSeed & {
+  notifications: NotificationRecord[]
   users: User[]
   passwords: Record<string, string>
   affiliates: AffiliateProfile[]
@@ -136,5 +139,7 @@ export function createSeed(now = Date.now()): SeedData {
 
   const passwords = Object.fromEntries(users.map((user) => [user.id, DEMO_PASSWORD]))
 
-  return { users, passwords, affiliates, products, ...createLeadSeed(users, products, now) }
+  const leadSeed = createLeadSeed(users, products, now)
+  const notifications = createNotificationSeed(leadSeed, products, now)
+  return { users, passwords, affiliates, products, ...leadSeed, notifications }
 }

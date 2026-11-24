@@ -1,5 +1,12 @@
 import { http, HttpResponse } from 'msw'
-import type { AuthResponse, LoginRequest, RegisterRequest, TokenPair, User } from '@/api/types'
+import type {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  TokenPair,
+  UpdateMeRequest,
+  User,
+} from '@/api/types'
 import { toLocalPhone, VN_PHONE_REGEX } from '@/lib/validation'
 import { db, findUserByEmail, findUserById, nextReferralCode, toMe } from '../db'
 import { api, apiError, authenticate, businessError, latency, readJson } from '../http'
@@ -106,5 +113,52 @@ export const authHandlers = [
     const auth = authenticate(request)
     if (auth.error) return auth.error
     return HttpResponse.json(toMe(auth.user))
+  }),
+
+  // Contract v0.4 (planned M4): own profile; bank fields for affiliates only.
+  http.patch(api('/auth/me'), async ({ request }) => {
+    await latency()
+    const auth = authenticate(request)
+    if (auth.error) return auth.error
+    const body = await readJson<UpdateMeRequest>(request)
+    const unknown = rejectUnknownProperties(body, [
+      'fullName',
+      'phone',
+      'bankName',
+      'bankAccountNumber',
+    ])
+    if (unknown) return unknown
+    const touchesBank = body.bankName !== undefined || body.bankAccountNumber !== undefined
+    if (touchesBank && auth.user.role !== 'AFFILIATE') {
+      return apiError(403, 'Only affiliates have bank details')
+    }
+
+    const phone = body.phone !== undefined ? toLocalPhone(body.phone) : undefined
+    const details: { field: string; message: string }[] = []
+    if (body.fullName !== undefined && !body.fullName.trim()) {
+      details.push({ field: 'fullName', message: 'fullName should not be empty' })
+    }
+    if (phone !== undefined && !VN_PHONE_REGEX.test(phone)) {
+      details.push({ field: 'phone', message: 'must be a valid VN phone number' })
+    }
+    if (body.bankName !== undefined && !(body.bankName.trim() && body.bankName.length <= 100)) {
+      details.push({ field: 'bankName', message: 'bankName must be 1–100 characters' })
+    }
+    if (body.bankAccountNumber !== undefined && !/^\d{6,20}$/.test(body.bankAccountNumber)) {
+      details.push({ field: 'bankAccountNumber', message: 'bankAccountNumber must be 6–20 digits' })
+    }
+    if (details.length) return apiError(400, 'Validation failed', details)
+
+    const user = auth.user
+    if (body.fullName !== undefined) user.fullName = body.fullName.trim()
+    if (phone !== undefined) user.phone = phone
+    const profile = db.affiliates.find((a) => a.userId === user.id)
+    if (profile && body.bankName !== undefined) profile.bankName = body.bankName.trim()
+    if (profile && body.bankAccountNumber !== undefined) {
+      // Only the last 4 digits are ever returned.
+      const digits = body.bankAccountNumber
+      profile.bankAccountMasked = `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`
+    }
+    return HttpResponse.json(toMe(user))
   }),
 ]
