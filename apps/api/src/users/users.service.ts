@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { type Paginated, pageArgs, toPage } from '../common/dto/pagination.dto';
+import { maskBankAccount } from '../common/masking';
 import { isUniqueViolation } from '../common/prisma-errors';
 import { Prisma } from '../generated/prisma/client';
 import { Role, UserStatus } from '../generated/prisma/enums';
@@ -206,6 +211,76 @@ export class UsersService {
     });
     return toUserDto(user);
   }
+
+  /**
+   * Self-service profile update (PATCH /auth/me). Bank details exist only for
+   * affiliates; the audit entry never contains the full account number.
+   */
+  async updateProfile(
+    viewer: { id: string; role: Role },
+    changes: ProfileChanges,
+  ): Promise<UserWithProfile> {
+    const touchesBank =
+      changes.bankName !== undefined || changes.bankAccountNumber !== undefined;
+    if (touchesBank && viewer.role !== Role.AFFILIATE) {
+      throw new ForbiddenException('Only affiliates have bank details');
+    }
+    const before = await this.findById(viewer.id);
+    if (!before) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: viewer.id },
+        data: { fullName: changes.fullName, phone: changes.phone },
+      });
+      if (touchesBank) {
+        await tx.affiliateProfile.update({
+          where: { userId: viewer.id },
+          data: {
+            bankName: changes.bankName,
+            bankAccount: changes.bankAccountNumber,
+          },
+        });
+      }
+      const after = await tx.user.findUniqueOrThrow({
+        where: { id: viewer.id },
+        include: { affiliateProfile: true },
+      });
+      await this.audit.record(
+        {
+          actorId: viewer.id,
+          action: 'PROFILE_UPDATED',
+          entityType: 'User',
+          entityId: viewer.id,
+          before: profileSnapshot(before),
+          after: profileSnapshot(after),
+        },
+        tx,
+      );
+      return after;
+    });
+  }
+}
+
+export interface ProfileChanges {
+  fullName?: string;
+  phone?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+}
+
+function profileSnapshot(user: UserWithProfile): Prisma.InputJsonObject {
+  const account = user.affiliateProfile?.bankAccount;
+  return {
+    fullName: user.fullName,
+    phone: user.phone,
+    ...(user.affiliateProfile && {
+      bankName: user.affiliateProfile.bankName,
+      bankAccountMasked: account ? maskBankAccount(account) : null,
+    }),
+  };
 }
 
 function pickEditable(user: {

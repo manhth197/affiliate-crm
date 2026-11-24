@@ -293,6 +293,82 @@
         "tags": [
           "auth"
         ]
+      },
+      "patch": {
+        "description": "bankName / bankAccountNumber are for affiliates only (403 otherwise). The account number is only ever returned masked.",
+        "operationId": "Auth_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update my profile",
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/v1/users": {
@@ -2001,6 +2077,514 @@
         ]
       }
     },
+    "/api/v1/payouts": {
+      "get": {
+        "description": "Affiliates only see their own (affiliateId is ignored).",
+        "operationId": "Payouts_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PayoutStatus"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "required": false,
+            "in": "query",
+            "description": "Ignored for affiliates (they only see their own payouts).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedPayouts"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List payouts",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/api/v1/payouts/generate": {
+      "post": {
+        "description": "Groups APPROVED commissions created in the month (Vietnam calendar) per affiliate. Safe to run again: DRAFT payouts are topped up, CONFIRMED/PAID ones are left alone.",
+        "operationId": "Payouts_generate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneratePayoutsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Generate DRAFT payouts for a month (background job)",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/api/v1/payouts/{id}/confirm": {
+      "patch": {
+        "operationId": "Payouts_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payout"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "DRAFT → CONFIRMED (admin)",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/api/v1/payouts/{id}/mark-paid": {
+      "patch": {
+        "description": "Also marks its commissions PAID and notifies the affiliate.",
+        "operationId": "Payouts_markPaid",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payout"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "CONFIRMED → PAID (admin)",
+        "tags": [
+          "payouts"
+        ]
+      }
+    },
+    "/api/v1/reports/overview": {
+      "get": {
+        "description": "Defaults to the last 30 Vietnam calendar days. Max range 366 days.",
+        "operationId": "Reports_overview",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive. ISO datetime with timezone. Default: start of the Vietnam day 29 days before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive. ISO datetime with timezone. Default: now.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOverview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pipeline and commission overview for [from, to)",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/top-affiliates": {
+      "get": {
+        "operationId": "Reports_topAffiliates",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive. ISO datetime with timezone. Default: start of the Vietnam day 29 days before `to`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive. ISO datetime with timezone. Default: now.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "description": "1–50",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TopAffiliate"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Best affiliates in [from, to)",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "operationId": "Notifications_list",
@@ -2361,7 +2945,8 @@
           "ASSIGNEE_NOT_STAFF",
           "CANNOT_DISABLE_SELF",
           "DISBURSED_AMOUNT_REQUIRED",
-          "INVALID_COMMISSION_STATUS"
+          "INVALID_COMMISSION_STATUS",
+          "INVALID_PAYOUT_STATUS"
         ],
         "description": "Machine-readable code on business errors (403 disabled account, 409, 422)."
       },
@@ -2627,6 +3212,32 @@
           "refreshToken",
           "expiresIn"
         ]
+      },
+      "UpdateMeRequest": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).",
+            "example": "+84 912 345 678"
+          },
+          "fullName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "bankName": {
+            "type": "string",
+            "description": "AFFILIATE only.",
+            "example": "Vietcombank",
+            "maxLength": 100
+          },
+          "bankAccountNumber": {
+            "type": "string",
+            "description": "AFFILIATE only. 6–20 digits; spaces are ignored. Returned only masked.",
+            "example": "0123456789",
+            "pattern": "^\\d{6,20}$"
+          }
+        }
       },
       "User": {
         "type": "object",
@@ -3445,6 +4056,235 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "PayoutStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "CONFIRMED",
+          "PAID"
+        ]
+      },
+      "Payout": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PayoutStatus"
+              }
+            ]
+          },
+          "paidAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affiliate": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "periodMonth": {
+            "type": "string",
+            "description": "Vietnam calendar month.",
+            "example": "2026-11"
+          },
+          "totalAmount": {
+            "type": "number",
+            "description": "VND",
+            "example": 1500000
+          },
+          "commissionCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "paidAt",
+          "createdAt",
+          "affiliate",
+          "periodMonth",
+          "totalAmount",
+          "commissionCount"
+        ]
+      },
+      "PaginatedPayouts": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Payout"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "GeneratePayoutsRequest": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "Month whose APPROVED commissions are paid out (Vietnam calendar).",
+            "example": "2026-11"
+          }
+        },
+        "required": [
+          "month"
+        ]
+      },
+      "JobAccepted": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "BullMQ job id."
+          }
+        },
+        "required": [
+          "jobId"
+        ]
+      },
+      "LeadsPerDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "Vietnam calendar day.",
+            "example": "2026-11-24"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "count"
+        ]
+      },
+      "ReportOverview": {
+        "type": "object",
+        "properties": {
+          "leadsByStatus": {
+            "required": [
+              "NEW",
+              "CONTACTED",
+              "SUBMITTED",
+              "APPROVED",
+              "DISBURSED",
+              "REJECTED"
+            ],
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Number of leads created in [from, to), by current status",
+            "properties": {
+              "NEW": {
+                "type": "integer"
+              },
+              "CONTACTED": {
+                "type": "integer"
+              },
+              "SUBMITTED": {
+                "type": "integer"
+              },
+              "APPROVED": {
+                "type": "integer"
+              },
+              "DISBURSED": {
+                "type": "integer"
+              },
+              "REJECTED": {
+                "type": "integer"
+              }
+            }
+          },
+          "commissionByStatus": {
+            "required": [
+              "PENDING",
+              "APPROVED",
+              "PAID",
+              "CANCELLED"
+            ],
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Commission amounts in VND (sum) for commissions created in [from, to), by status",
+            "properties": {
+              "PENDING": {
+                "type": "integer"
+              },
+              "APPROVED": {
+                "type": "integer"
+              },
+              "PAID": {
+                "type": "integer"
+              },
+              "CANCELLED": {
+                "type": "integer"
+              }
+            }
+          },
+          "conversionRate": {
+            "type": "number",
+            "description": "DISBURSED ÷ all leads created in the range, 0..1 (4 decimals).",
+            "example": 0.2083
+          },
+          "disbursedAmount": {
+            "type": "number",
+            "description": "VND disbursed for leads created in the range."
+          },
+          "leadsPerDay": {
+            "description": "One entry per Vietnam calendar day in the range (0 when no leads).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeadsPerDay"
+            }
+          }
+        },
+        "required": [
+          "conversionRate",
+          "disbursedAmount",
+          "leadsPerDay"
+        ]
+      },
+      "TopAffiliate": {
+        "type": "object",
+        "properties": {
+          "affiliate": {
+            "$ref": "#/components/schemas/LeadAffiliate"
+          },
+          "leads": {
+            "type": "number",
+            "description": "Leads created in the range."
+          },
+          "disbursed": {
+            "type": "number",
+            "description": "Of those, how many are DISBURSED."
+          },
+          "commission": {
+            "type": "number",
+            "description": "VND, commissions created in the range, excluding CANCELLED."
+          }
+        },
+        "required": [
+          "affiliate",
+          "leads",
+          "disbursed",
+          "commission"
         ]
       },
       "NotificationType": {

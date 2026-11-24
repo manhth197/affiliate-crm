@@ -392,4 +392,72 @@ describe('Auth (e2e)', () => {
         .expect(401);
     });
   });
+
+  describe('PATCH /auth/me', () => {
+    it('lets an affiliate update profile and bank details (returned masked, audited masked)', async () => {
+      const email = uniqueEmail('profile');
+      const session = (await register({ email }).expect(201)).body;
+
+      const res = await ctx
+        .http()
+        .patch(`${API}/auth/me`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .send({
+          fullName: ' Nguyễn Văn Mới ',
+          phone: '+84 987 654 321',
+          bankName: 'Vietcombank',
+          bankAccountNumber: '0123 456 789',
+        })
+        .expect(200);
+      expect(res.body).toMatchObject({
+        fullName: 'Nguyễn Văn Mới',
+        phone: '0987654321',
+        affiliate: { bankName: 'Vietcombank', bankAccountMasked: '******6789' },
+      });
+      expect(JSON.stringify(res.body)).not.toContain('0123456789');
+
+      const stored = await ctx.prisma.affiliateProfile.findFirstOrThrow({
+        where: { user: { email } },
+      });
+      expect(stored.bankAccount).toBe('0123456789');
+
+      const audit = await ctx.prisma.auditLog.findFirstOrThrow({
+        where: { entityId: res.body.id, action: 'PROFILE_UPDATED' },
+      });
+      expect(JSON.stringify(audit)).not.toContain('0123456789');
+      expect(audit.after).toMatchObject({ bankAccountMasked: '******6789' });
+    });
+
+    it('forbids bank details for staff but allows other fields', async () => {
+      const staff = await createUser(ctx, { role: Role.STAFF });
+      const { accessToken } = await login(ctx, staff.email);
+      await ctx
+        .http()
+        .patch(`${API}/auth/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ bankName: 'Vietcombank' })
+        .expect(403);
+      const res = await ctx
+        .http()
+        .patch(`${API}/auth/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ fullName: 'Nhân Viên Mới' })
+        .expect(200);
+      expect(res.body.fullName).toBe('Nhân Viên Mới');
+    });
+
+    it('validates input and refuses fields it does not own', async () => {
+      const session = (await register().expect(201)).body;
+      const res = await ctx
+        .http()
+        .patch(`${API}/auth/me`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .send({ bankAccountNumber: 'abc', role: 'ADMIN' })
+        .expect(400);
+      const fields = res.body.details.map((d: { field: string }) => d.field);
+      expect(fields).toEqual(
+        expect.arrayContaining(['bankAccountNumber', 'role']),
+      );
+    });
+  });
 });

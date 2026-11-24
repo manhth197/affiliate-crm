@@ -11,10 +11,12 @@ import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
 import { QueuesModule } from './queues/queues.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { ReportsModule } from './reports/reports.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -36,6 +38,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ProductsModule,
     LeadsModule,
     CommissionsModule,
+    PayoutsModule,
+    ReportsModule,
     NotificationsModule,
     RealtimeModule,
     WebhooksModule,
