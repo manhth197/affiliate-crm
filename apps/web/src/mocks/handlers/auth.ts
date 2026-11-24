@@ -14,6 +14,7 @@ import { rejectUnknownProperties } from '../query'
 import {
   clearRefreshCookie,
   issueTokens,
+  publicTokens,
   readRefreshCookie,
   revokeRefreshToken,
   rotateRefreshToken,
@@ -67,7 +68,7 @@ export const authHandlers = [
 
     const tokens = issueTokens(user.id)
     return HttpResponse.json<AuthResponse>(
-      { user: toMe(user), ...tokens },
+      { user: toMe(user), ...publicTokens(tokens) },
       { status: 201, headers: setRefreshCookie(request, tokens.refreshToken) },
     )
   }),
@@ -87,24 +88,23 @@ export const authHandlers = [
     }
     const tokens = issueTokens(user.id)
     return HttpResponse.json<AuthResponse>(
-      { user: toMe(user), ...tokens },
+      { user: toMe(user), ...publicTokens(tokens) },
       { headers: setRefreshCookie(request, tokens.refreshToken) },
     )
   }),
 
-  // Contract v0.6: the token comes from the httpOnly cookie (or, deprecated, the body).
+  // Contract v0.7: the refresh token only travels in the httpOnly cookie; the body is `{}`.
   http.post(api('/auth/refresh'), async ({ request }) => {
     await latency()
-    const body = await readJson<{ refreshToken: string }>(request)
-    const unknown = rejectUnknownProperties(body, ['refreshToken'])
-    if (unknown) return unknown
     const isJson = request.headers.get('content-type')?.includes('application/json') ?? false
-    if (!body.refreshToken && !isJson) {
-      // Cookie-only refresh must be JSON (forces a CORS preflight); the token is not consumed.
+    if (!isJson) {
+      // Must be JSON (forces a CORS preflight); the token is not consumed.
       return apiError(415, 'Content-Type must be application/json')
     }
+    const unknown = rejectUnknownProperties(await readJson<Record<string, unknown>>(request), [])
+    if (unknown) return unknown
 
-    const token = body.refreshToken ?? readRefreshCookie(request)
+    const token = readRefreshCookie(request)
     const session = token ? db.sessions[token] : undefined
     if (session && findUserById(session.userId)?.status === 'DISABLED') {
       revokeRefreshToken(token!)
@@ -112,18 +112,19 @@ export const authHandlers = [
     }
     const tokens = token ? rotateRefreshToken(token) : null
     if (!tokens) return apiError(401, 'Invalid refresh token', undefined, clearRefreshCookie())
-    return HttpResponse.json<TokenPair>(tokens, {
+    return HttpResponse.json<TokenPair>(publicTokens(tokens), {
       headers: setRefreshCookie(request, tokens.refreshToken),
     })
   }),
 
-  // Contract v0.2: always 204; an unknown or foreign token is ignored.
+  // Always 204 (v0.2); the token comes from the cookie and the cookie is cleared (v0.7).
   http.post(api('/auth/logout'), async ({ request }) => {
     await latency()
     const auth = authenticate(request)
     if (auth.error) return auth.error
-    const body = await readJson<{ refreshToken: string }>(request)
-    const refreshToken = body.refreshToken ?? readRefreshCookie(request)
+    const unknown = rejectUnknownProperties(await readJson<Record<string, unknown>>(request), [])
+    if (unknown) return unknown
+    const refreshToken = readRefreshCookie(request)
     if (refreshToken && db.sessions[refreshToken]?.userId === auth.user.id) {
       revokeRefreshToken(refreshToken)
     }
