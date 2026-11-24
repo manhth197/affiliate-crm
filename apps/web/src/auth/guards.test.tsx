@@ -1,5 +1,5 @@
 import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type { Role } from '@/api/types'
 import { NAV_ITEMS } from '@/lib/navigation'
 import { renderApp, type DemoEmail } from '@/test/render'
@@ -16,6 +16,11 @@ async function sidebarLinks() {
     .getAllByRole('link')
     .map((link) => link.textContent)
 }
+
+// Pages are lazy routes; load the heaviest chunk (Recharts) once so no test waits on it.
+beforeAll(async () => {
+  await import('@/features/reports/reports-page')
+})
 
 describe('route guards', () => {
   it('sends guests to the login page and back to the requested page after login', async () => {
