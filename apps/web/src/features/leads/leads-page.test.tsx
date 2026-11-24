@@ -65,7 +65,8 @@ describe('LeadsPage (affiliate)', () => {
 
     await user.type(screen.getByLabelText('Tìm lead'), plain)
 
-    expect(await screen.findByText(target.code)).toBeVisible()
+    // Debounced search (400 ms) + request: allow more than the default 1 s under a busy CI.
+    expect(await screen.findByText(target.code, {}, { timeout: 3000 })).toBeVisible()
     expect(router.state.location.search).toContain('q=')
   })
 
