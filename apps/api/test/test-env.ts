@@ -48,6 +48,8 @@ export function applyTestEnv(): void {
     AUTH_THROTTLE_LIMIT: '1000',
     AUTH_THROTTLE_TTL_SECONDS: '60',
     CORS_ORIGINS: 'http://localhost:5173',
+    // As in production behind Caddy; auth-throttle.e2e-spec.ts relies on it.
+    TRUST_PROXY: '1',
     PARTNER_WEBHOOKS: JSON.stringify(TEST_PARTNERS),
     // Tests call reconcile() directly instead of waiting for the scheduler.
     COMMISSION_RECONCILE_MINUTES: '0',

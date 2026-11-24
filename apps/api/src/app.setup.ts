@@ -1,4 +1,5 @@
 import type { INestApplication, NestApplicationOptions } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import {
@@ -23,6 +24,12 @@ export function configureApp(app: INestApplication): void {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const proxyHops = config.get('TRUST_PROXY', { infer: true });
+  if (proxyHops > 0) {
+    // Behind Caddy/ALB: take the client IP from X-Forwarded-For (only that many
+    // hops), so rate limits are per user and not per proxy.
+    (app as NestExpressApplication).set('trust proxy', proxyHops);
+  }
   app.setGlobalPrefix(API_PREFIX);
   // Reads the crm_rt refresh-token cookie into request.cookies.
   app.use(cookieParser());
