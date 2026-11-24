@@ -6,6 +6,8 @@ import { UsersService } from '../users/users.service';
 import type { AuthResponseDto, TokenPairDto } from './dto/auth-response.dto';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { UpdateMeDto } from './dto/update-me.dto';
+import type { AuthUser } from './auth.types';
 import { PasswordService } from '../users/password.service';
 import { TokenService } from './token.service';
 import { conflict, ErrorCode, forbidden } from '../common/errors/error-codes';
@@ -57,6 +59,10 @@ export class AuthService {
 
   logout(userId: string, refreshToken: string): Promise<void> {
     return this.tokens.revoke(refreshToken, userId);
+  }
+
+  async updateMe(user: AuthUser, dto: UpdateMeDto): Promise<MeDto> {
+    return toMeDto(await this.users.updateProfile(user, dto));
   }
 
   async me(userId: string): Promise<MeDto> {

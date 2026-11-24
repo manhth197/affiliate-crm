@@ -12,7 +12,9 @@ export type AuditAction =
   | 'COMMISSION_APPROVED'
   | 'COMMISSION_CANCELLED'
   | 'PAYOUT_CONFIRMED'
-  | 'PAYOUT_PAID';
+  | 'PAYOUT_GENERATED'
+  | 'PAYOUT_PAID'
+  | 'PROFILE_UPDATED';
 
 export type AuditEntityType =
   'Lead' | 'Product' | 'User' | 'Commission' | 'Payout';

@@ -1,9 +1,10 @@
-# Affiliate CRM — API Contract v0.4
+# Affiliate CRM — API Contract v0.5
 
 Source of truth for `apps/api` and `apps/web`. Changes go through the coordinator (see `_dieu-phoi/CONVENTIONS.md`). Once the API runs, `docs/openapi.json` (exported from Swagger) must match this document.
 
 ## Changelog
-- **v0.4 (2026-11-24)**: error codes `CANNOT_DISABLE_SELF`, `DISBURSED_AMOUNT_REQUIRED`, `INVALID_COMMISSION_STATUS`; commission approve/cancel rules; webhook partner scoping and partner config; socket disconnect on token expiry; notification `data` shapes.
+- **v0.5 (2026-11-24)**: `INVALID_PAYOUT_STATUS`; payout generation includes carry-over of late-approved commissions; report scoping rules (`commissionByStatus` is VND totals); `PATCH /auth/me` validation.
+- v0.4 (2026-11-24): error codes `CANNOT_DISABLE_SELF`, `DISBURSED_AMOUNT_REQUIRED`, `INVALID_COMMISSION_STATUS`; commission approve/cancel rules; webhook partner scoping and partner config; socket disconnect on token expiry; notification `data` shapes.
 - v0.3 (2026-11-24): machine-readable `code` on business errors; lead business rules (duplicate open lead, 422 cases, concurrent update, assign rules, CCCD format); `LeadActivity.assignee`; `assignedStaffId=none`; `q` is case- and accent-insensitive; `sort` whitelist; CSV export rules.
 - v0.2 (2026-11-24): disabled accounts get 403; logout always 204; unknown body properties → 400; phone/email normalization; `expiresIn` in token responses; refresh tokens are single-use (clients must single-flight refresh); date-range and timezone rules; new `GET /staff`; new `PATCH /auth/me` (planned for M4); decision-record naming.
 - v0.1 (2026-11-24): first version.
@@ -25,7 +26,7 @@ Source of truth for `apps/api` and `apps/web`. Changes go through the coordinato
   { "statusCode": 400, "error": "Bad Request", "message": "Validation failed", "details": [{ "field": "customerPhone", "message": "must be a valid VN phone number" }] }
   ```
   Codes used: 400 validation, 401 not logged in / bad token, 403 wrong role or not owner, 404, 409 conflict (e.g. invalid status transition, duplicate email), 422 business rule, 429 rate limit.
-- Business errors (403 disabled account, 409, 422) also carry a machine-readable `code` so the web can show its own Vietnamese message: `ACCOUNT_DISABLED`, `EMAIL_TAKEN`, `DUPLICATE_LEAD`, `INVALID_TRANSITION`, `CONCURRENT_UPDATE`, `PRODUCT_UNAVAILABLE`, `AMOUNT_NOT_ALLOWED`, `ASSIGNEE_NOT_STAFF`, `CANNOT_DISABLE_SELF` (422, an admin disabling their own account), `DISBURSED_AMOUNT_REQUIRED` (422, webhook `DISBURSED` without an amount), `INVALID_COMMISSION_STATUS` (409, approve/cancel from the wrong status). The OpenAPI enum `ErrorCode` lists them all. Example: `{ "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_LEAD", "message": "This customer already has an open lead for this product" }`.
+- Business errors (403 disabled account, 409, 422) also carry a machine-readable `code` so the web can show its own Vietnamese message: `ACCOUNT_DISABLED`, `EMAIL_TAKEN`, `DUPLICATE_LEAD`, `INVALID_TRANSITION`, `CONCURRENT_UPDATE`, `PRODUCT_UNAVAILABLE`, `AMOUNT_NOT_ALLOWED`, `ASSIGNEE_NOT_STAFF`, `CANNOT_DISABLE_SELF` (422, an admin disabling their own account), `DISBURSED_AMOUNT_REQUIRED` (422, webhook `DISBURSED` without an amount), `INVALID_COMMISSION_STATUS` (409, approve/cancel from the wrong status), `INVALID_PAYOUT_STATUS` (409, confirm/mark-paid from the wrong status). The OpenAPI enum `ErrorCode` lists them all. Example: `{ "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_LEAD", "message": "This customer already has an open lead for this product" }`.
 - Roles: `ADMIN`, `STAFF`, `AFFILIATE`. "Owner" = the affiliate who created the lead.
 
 ## Enums
@@ -89,7 +90,7 @@ type Notification = { id: string; type: NotificationType; title: string; body: s
 | `POST /auth/refresh` | public | `{refreshToken}` | `200 {accessToken, refreshToken, expiresIn}`; invalid/reused token → 401; `DISABLED` account → 403 |
 | `POST /auth/logout` | any | `{refreshToken}` | always `204` (unknown or foreign token is ignored, nothing leaked) |
 | `GET /auth/me` | any | – | `200 Me` |
-| `PATCH /auth/me` *(planned M4)* | any | `{fullName?, phone?, bankName?, bankAccountNumber?}` (bank fields AFFILIATE only, else 403) | `200 Me` (bank account returned only as `bankAccountMasked`, last 4 digits visible) |
+| `PATCH /auth/me` | any | `{fullName?, phone?, bankName?, bankAccountNumber?}` (bank fields AFFILIATE only, else 403; `bankAccountNumber` 6–20 digits, spaces removed) | `200 Me` (bank account returned only as `bankAccountMasked`, last 4 digits visible) |
 
 `expiresIn` = seconds until the access token expires (900).
 
@@ -128,11 +129,13 @@ Lead business rules:
 | `PATCH /commissions/:id/approve` | ADMIN | – | `200 Commission` (PENDING → APPROVED; otherwise 409 `INVALID_COMMISSION_STATUS`) |
 | `PATCH /commissions/:id/cancel` | ADMIN | `{reason}` | `200 Commission` (only from `PENDING` or `APPROVED` and not yet in a payout; otherwise 409 `INVALID_COMMISSION_STATUS`) |
 | `GET /payouts` | any | `?status=&month=&affiliateId=&page=&pageSize=` | `200 Paginated<Payout>` (AFFILIATE: own only) |
-| `POST /payouts/generate` | ADMIN | `{month: "YYYY-MM"}` | `202 {jobId}` (BullMQ job; creates DRAFT payouts from APPROVED commissions) |
+| `POST /payouts/generate` | ADMIN | `{month: "YYYY-MM"}` | `202 {jobId}` (BullMQ job, safe to re-run). Per affiliate, the payout for that month takes **every APPROVED commission not yet in a payout whose `createdAt` is before the end of that month** (Vietnam calendar). Late approvals from earlier months therefore roll into the next payout instead of being left behind. An existing DRAFT payout for that month is recalculated; CONFIRMED and PAID payouts are never changed. |
 | `PATCH /payouts/:id/confirm` | ADMIN | – | `200 Payout` (DRAFT → CONFIRMED) |
 | `PATCH /payouts/:id/mark-paid` | ADMIN | – | `200 Payout` (CONFIRMED → PAID; commissions → PAID; notifies affiliate) |
 
 ### Reports (STAFF, ADMIN)
+Scoping: lead metrics count leads by `leads.createdAt` (with their current status); commission metrics use `commissions.createdAt`; `commissionByStatus` is the **VND total** per status (not a count); top-affiliates ignores CANCELLED commissions and sorts by commission, then disbursed count, then lead count; `limit` 1–50 (default 10); `conversionRate` rounded to 4 decimals. Without `from`/`to` the range is the last 30 Vietnam calendar days; a range over 366 days or `from ≥ to` → 400. Empty days are filled with 0 in `leadsPerDay`.
+
 | `GET /reports/overview` | `?from=&to=` | `200 {leadsByStatus: Record<LeadStatus, number>, conversionRate: number /* DISBURSED ÷ all, 0..1 */, disbursedAmount: number, commissionByStatus: Record<CommissionStatus, number>, leadsPerDay: {date: string, count: number}[]}` |
 |---|---|---|
 | `GET /reports/top-affiliates` | `?from=&to=&limit=10` | `200 {affiliate: {id, fullName, referralCode}, leads: number, disbursed: number, commission: number}[]` |

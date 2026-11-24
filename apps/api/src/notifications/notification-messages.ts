@@ -80,3 +80,29 @@ export function commissionCreatedMessage(input: {
     },
   };
 }
+
+/** "2026-11" → "11/2026" */
+function formatMonth(periodMonth: string): string {
+  const [year, month] = periodMonth.split('-');
+  return `${month}/${year}`;
+}
+
+export function payoutPaidMessage(input: {
+  affiliateId: string;
+  payoutId: string;
+  periodMonth: string;
+  totalAmount: number;
+  commissionCount: number;
+}): NotificationMessage {
+  return {
+    userId: input.affiliateId,
+    type: NotificationType.PAYOUT_PAID,
+    title: `Đã chi trả hoa hồng tháng ${formatMonth(input.periodMonth)}`,
+    body: `Số tiền ${formatVnd(input.totalAmount)} cho ${input.commissionCount} khoản hoa hồng.`,
+    data: {
+      payoutId: input.payoutId,
+      periodMonth: input.periodMonth,
+      totalAmount: String(input.totalAmount),
+    },
+  };
+}

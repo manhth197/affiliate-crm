@@ -1,9 +1,8 @@
 /**
- * Demo data (see "Seed data" in docs/api-contract.md). Idempotent: safe to run
- * repeatedly with `npm run db:seed`.
- *
- * Seeds demo accounts and products. Leads, commissions and payouts are added
- * in M4. Partner names are fictional.
+ * Demo data (see "Seed data" in docs/api-contract.md): demo accounts, six
+ * products (fictional partners) and a demo pipeline. Safe to run repeatedly:
+ * users and products are upserted; the pipeline is only created when there
+ * are no leads yet (`npm run db:reset` for a fresh demo).
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -14,6 +13,7 @@ import {
   ProductCategory,
   Role,
 } from '../src/generated/prisma/enums';
+import { seedPipeline } from './seed-pipeline';
 
 const DEMO_PASSWORD = 'Demo@12345';
 
@@ -26,6 +26,8 @@ interface DemoUser {
     referralCode: string;
     bankName?: string;
     bankAccount?: string;
+    /** Share of the demo leads. */
+    weight: number;
   };
 }
 
@@ -51,6 +53,7 @@ const USERS: DemoUser[] = [
       referralCode: 'CTVDEMA22',
       bankName: 'Vietcombank',
       bankAccount: '0123456789',
+      weight: 0.45,
     },
   },
   {
@@ -58,14 +61,14 @@ const USERS: DemoUser[] = [
     fullName: 'Trần Thị Bình',
     phone: '0912000002',
     role: Role.AFFILIATE,
-    affiliate: { referralCode: 'CTVDEMA33' },
+    affiliate: { referralCode: 'CTVDEMA33', weight: 0.35 },
   },
   {
     email: 'ctv3@demo.vn',
     fullName: 'Lê Hoàng Cường',
     phone: '0912000003',
     role: Role.AFFILIATE,
-    affiliate: { referralCode: 'CTVDEMA44' },
+    affiliate: { referralCode: 'CTVDEMA44', weight: 0.2 },
   },
 ];
 
@@ -129,6 +132,7 @@ async function main(): Promise<void> {
     const passwordHash = await argon2.hash(DEMO_PASSWORD, {
       type: argon2.argon2id,
     });
+    const ids = new Map<string, string>();
     for (const { affiliate, ...user } of USERS) {
       const profile = affiliate
         ? {
@@ -137,7 +141,7 @@ async function main(): Promise<void> {
             bankAccount: affiliate.bankAccount ?? null,
           }
         : undefined;
-      await prisma.user.upsert({
+      const saved = await prisma.user.upsert({
         where: { email: user.email },
         update: {
           ...user,
@@ -154,6 +158,7 @@ async function main(): Promise<void> {
           ...(profile && { affiliateProfile: { create: profile } }),
         },
       });
+      ids.set(user.email, saved.id);
     }
     for (const { id, ...product } of PRODUCTS) {
       await prisma.product.upsert({
@@ -165,6 +170,17 @@ async function main(): Promise<void> {
     console.log(
       `Seeded ${USERS.length} demo users (password: ${DEMO_PASSWORD}) and ${PRODUCTS.length} products`,
     );
+
+    const pipeline = await seedPipeline(prisma, {
+      adminId: ids.get('admin@demo.vn')!,
+      staffId: ids.get('staff@demo.vn')!,
+      affiliates: USERS.filter((u) => u.affiliate).map((u) => ({
+        id: ids.get(u.email)!,
+        weight: u.affiliate!.weight,
+      })),
+      products: PRODUCTS,
+    });
+    console.log(`Demo pipeline: ${pipeline}`);
   } finally {
     await prisma.$disconnect();
   }

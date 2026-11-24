@@ -21,6 +21,8 @@ export const ErrorCode = {
   CANNOT_DISABLE_SELF: 'CANNOT_DISABLE_SELF',
   DISBURSED_AMOUNT_REQUIRED: 'DISBURSED_AMOUNT_REQUIRED',
   INVALID_COMMISSION_STATUS: 'INVALID_COMMISSION_STATUS',
+  // Added in M4:
+  INVALID_PAYOUT_STATUS: 'INVALID_PAYOUT_STATUS',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
