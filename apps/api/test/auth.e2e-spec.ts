@@ -6,6 +6,8 @@ import {
   createUser,
   login,
   PASSWORD,
+  refreshCookie,
+  refreshWith,
   resetDatabase,
   type TestContext,
   uniqueEmail,
@@ -61,10 +63,12 @@ describe('Auth (e2e)', () => {
           },
         },
         accessToken: expect.any(String),
-        refreshToken: expect.any(String),
         expiresIn: 900,
       });
       expect(JSON.stringify(res.body)).not.toContain('passwordHash');
+      // v0.7: the refresh token is only in the httpOnly cookie.
+      expect(res.body).not.toHaveProperty('refreshToken');
+      expect(refreshCookie(res)).toMatch(/^crm_rt=[A-Za-z0-9_-]{43}$/);
     });
 
     it('stores the password as an argon2id hash and the refresh token only as a hash', async () => {
@@ -77,7 +81,8 @@ describe('Auth (e2e)', () => {
       });
       expect(user.passwordHash).toMatch(/^\$argon2id\$/);
       expect(user.refreshTokens).toHaveLength(1);
-      expect(user.refreshTokens[0].tokenHash).not.toBe(res.body.refreshToken);
+      const token = refreshCookie(res).slice('crm_rt='.length);
+      expect(user.refreshTokens[0].tokenHash).not.toBe(token);
       expect(user.refreshTokens[0].tokenHash).toMatch(/^[0-9a-f]{64}$/);
     });
 
@@ -136,7 +141,8 @@ describe('Auth (e2e)', () => {
         .expect(200);
       expect(res.body.user.email).toBe(email);
       expect(res.body.accessToken).toEqual(expect.any(String));
-      expect(res.body.refreshToken).toEqual(expect.any(String));
+      expect(res.body).not.toHaveProperty('refreshToken');
+      expect(refreshCookie(res)).toMatch(/^crm_rt=/);
     });
 
     it('gives the same 401 for a wrong password and an unknown email', async () => {
@@ -231,172 +237,122 @@ describe('Auth (e2e)', () => {
     });
   });
 
-  describe('POST /auth/refresh', () => {
-    it('rotates: returns a new pair and the old refresh token stops working', async () => {
-      const email = uniqueEmail('rotate');
-      const first = (await register({ email }).expect(201)).body;
+  describe('POST /auth/refresh (crm_rt cookie only, v0.7)', () => {
+    it('rotates: returns a new access token and cookie; the old cookie stops working', async () => {
+      const first = refreshCookie(await register().expect(201));
 
-      const second = (
-        await ctx
-          .http()
-          .post(`${API}/auth/refresh`)
-          .send({ refreshToken: first.refreshToken })
-          .expect(200)
-      ).body;
-      expect(Object.keys(second).sort()).toEqual([
-        'accessToken',
-        'expiresIn',
-        'refreshToken',
-      ]);
-      expect(second.expiresIn).toBe(900);
-      expect(second.refreshToken).not.toBe(first.refreshToken);
+      const res = await refreshWith(ctx, first).expect(200);
+      expect(res.body).toEqual({
+        accessToken: expect.any(String),
+        expiresIn: 900,
+      });
+      const second = refreshCookie(res);
+      expect(second).not.toBe(first);
 
       // The new access token works.
       await ctx
         .http()
         .get(`${API}/auth/me`)
-        .set('Authorization', `Bearer ${second.accessToken}`)
+        .set('Authorization', `Bearer ${res.body.accessToken}`)
         .expect(200);
 
-      // The new refresh token can be used once more.
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: second.refreshToken })
-        .expect(200);
+      // The new cookie can be used once more.
+      await refreshWith(ctx, second).expect(200);
     });
 
-    it('revokes the whole session when an old refresh token is replayed', async () => {
-      const email = uniqueEmail('replay');
-      const first = (await register({ email }).expect(201)).body;
-      const second = (
-        await ctx
-          .http()
-          .post(`${API}/auth/refresh`)
-          .send({ refreshToken: first.refreshToken })
-          .expect(200)
-      ).body;
+    it('revokes the whole session when an old cookie is replayed', async () => {
+      const first = refreshCookie(await register().expect(201));
+      const second = refreshCookie(await refreshWith(ctx, first).expect(200));
 
       // Attacker replays the stolen, already-rotated token.
-      const replay = await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: first.refreshToken })
-        .expect(401);
+      const replay = await refreshWith(ctx, first).expect(401);
       expect(replay.body.message).toBe('Refresh token has been revoked');
 
       // The legitimate latest token is now revoked too.
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: second.refreshToken })
-        .expect(401);
+      await refreshWith(ctx, second).expect(401);
     });
 
     it('does not affect other sessions of the same user', async () => {
       const email = uniqueEmail('multi');
-      const laptop = (await register({ email }).expect(201)).body;
+      const laptop = refreshCookie(await register({ email }).expect(201));
       const phone = await login(ctx, email);
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: laptop.refreshToken })
-        .expect(200);
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: laptop.refreshToken })
-        .expect(401);
+      await refreshWith(ctx, laptop).expect(200);
+      await refreshWith(ctx, laptop).expect(401);
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: phone.refreshToken })
-        .expect(200);
+      await refreshWith(ctx, phone.cookie).expect(200);
     });
 
-    it('rejects an unknown token, an empty body without cookie, and a malformed token', async () => {
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: 'made-up-token' })
-        .expect(401);
-      // v0.6: the body token is optional (the cookie is the fallback).
-      const empty = await ctx
+    it('401s an unknown cookie and a missing cookie; 400s any body property', async () => {
+      await refreshWith(ctx, 'crm_rt=made-up-token').expect(401);
+
+      const missing = await ctx
         .http()
         .post(`${API}/auth/refresh`)
         .send({})
         .expect(401);
-      expect(empty.body.message).toBe('Missing refresh token');
-      const malformed = await ctx
+      expect(missing.body.message).toBe('Missing refresh token');
+
+      // Old clients that still send the token in the body get a clear 400.
+      const legacy = await ctx
         .http()
         .post(`${API}/auth/refresh`)
-        .send({ refreshToken: 123 })
+        .send({ refreshToken: 'anything' })
         .expect(400);
-      expect(malformed.body.details[0].field).toBe('refreshToken');
+      expect(legacy.body.details).toEqual([
+        {
+          field: 'refreshToken',
+          message: 'property refreshToken should not exist',
+        },
+      ]);
     });
 
     it('refuses to refresh once the account is disabled', async () => {
       const email = uniqueEmail('disable');
-      const session = (await register({ email }).expect(201)).body;
+      const cookie = refreshCookie(await register({ email }).expect(201));
       await ctx.prisma.user.update({
         where: { email },
         data: { status: UserStatus.DISABLED },
       });
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: session.refreshToken })
-        .expect(403);
+      await refreshWith(ctx, cookie).expect(403);
     });
   });
 
   describe('POST /auth/logout', () => {
-    it('revokes the given refresh token and returns 204', async () => {
-      const email = uniqueEmail('logout');
-      const session = (await register({ email }).expect(201)).body;
+    it('revokes the cookie token and returns 204', async () => {
+      const res = await register().expect(201);
+      const cookie = refreshCookie(res);
 
-      const res = await ctx
+      const logout = await ctx
         .http()
         .post(`${API}/auth/logout`)
-        .set('Authorization', `Bearer ${session.accessToken}`)
-        .send({ refreshToken: session.refreshToken })
+        .set('Authorization', `Bearer ${res.body.accessToken}`)
+        .set('Cookie', cookie)
+        .send({})
         .expect(204);
-      expect(res.text).toBe('');
+      expect(logout.text).toBe('');
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: session.refreshToken })
-        .expect(401);
+      await refreshWith(ctx, cookie).expect(401);
     });
 
     it("cannot revoke another user's refresh token", async () => {
-      const victim = (await register().expect(201)).body;
+      const victim = refreshCookie(await register().expect(201));
       const attacker = (await register().expect(201)).body;
 
       await ctx
         .http()
         .post(`${API}/auth/logout`)
         .set('Authorization', `Bearer ${attacker.accessToken}`)
-        .send({ refreshToken: victim.refreshToken })
+        .set('Cookie', victim)
+        .send({})
         .expect(204);
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: victim.refreshToken })
-        .expect(200);
+      await refreshWith(ctx, victim).expect(200);
     });
 
     it('requires an access token', async () => {
-      await ctx
-        .http()
-        .post(`${API}/auth/logout`)
-        .send({ refreshToken: 'anything' })
-        .expect(401);
+      await ctx.http().post(`${API}/auth/logout`).send({}).expect(401);
     });
   });
 
