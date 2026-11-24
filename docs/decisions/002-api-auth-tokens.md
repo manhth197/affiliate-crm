@@ -15,7 +15,7 @@ The contract fixes a 15-minute access token and a 7-day refresh token sent in th
 - Refresh token as a JWT: self-contained but still needs a DB record to revoke, so no real gain.
 - Checking the user in the DB on every request: instant revocation, but one extra query per call. 15 minutes of exposure is the accepted trade-off.
 - bcrypt: fine, but truncates at 72 bytes and is not memory-hard.
-- Refresh token in an HttpOnly cookie: safer against XSS, but the contract specifies the body; can be revisited with CSRF protection.
+- Refresh token in an HttpOnly cookie: safer against XSS, but the contract specified the body. Adopted in contract v0.6, see decision 009.
 
 ## Consequences
 - The web client must serialise refreshes (one in-flight refresh shared by all requests); two parallel refreshes with the same token make the second fail with 401.

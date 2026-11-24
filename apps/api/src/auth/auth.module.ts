@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { RefreshCookieService } from './refresh-cookie.service';
 import { TokenService } from './token.service';
 
 @Module({
@@ -46,6 +47,7 @@ import { TokenService } from './token.service';
   providers: [
     AuthService,
     TokenService,
+    RefreshCookieService,
     // Order matters: authenticate first, then check roles.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

@@ -17,6 +17,14 @@
         },
         "responses": {
           "201": {
+            "headers": {
+              "Set-Cookie": {
+                "description": "crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "description": "",
             "content": {
               "application/json": {
@@ -79,6 +87,14 @@
         },
         "responses": {
           "200": {
+            "headers": {
+              "Set-Cookie": {
+                "description": "crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "description": "",
             "content": {
               "application/json": {
@@ -137,7 +153,7 @@
     },
     "/api/v1/auth/refresh": {
       "post": {
-        "description": "Refresh tokens are single use. Reusing an old one revokes the whole session (401).",
+        "description": "Uses `refreshToken` from the body if present (deprecated), otherwise the `crm_rt` cookie; cookie calls must be `Content-Type: application/json`. Refresh tokens are single use: reusing an old one revokes the whole session (401). On 401/403 the cookie is cleared.",
         "operationId": "Auth_refresh",
         "parameters": [],
         "requestBody": {
@@ -152,6 +168,14 @@
         },
         "responses": {
           "200": {
+            "headers": {
+              "Set-Cookie": {
+                "description": "crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "description": "",
             "content": {
               "application/json": {
@@ -162,7 +186,7 @@
             }
           },
           "401": {
-            "description": "Invalid, expired or reused refresh token",
+            "description": "Missing, invalid, expired or reused refresh token",
             "content": {
               "application/json": {
                 "schema": {
@@ -173,6 +197,16 @@
           },
           "403": {
             "description": "Account is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Cookie call without Content-Type: application/json",
             "content": {
               "application/json": {
                 "schema": {
@@ -192,6 +226,11 @@
             }
           }
         },
+        "security": [
+          {
+            "refreshCookie": []
+          }
+        ],
         "summary": "Exchange a refresh token for a new token pair",
         "tags": [
           "auth"
@@ -200,6 +239,7 @@
     },
     "/api/v1/auth/logout": {
       "post": {
+        "description": "Revokes the refresh token from the body (deprecated) or the `crm_rt` cookie, and always clears the cookie.",
         "operationId": "Auth_logout",
         "parameters": [],
         "requestBody": {
@@ -242,7 +282,7 @@
             "bearer": []
           }
         ],
-        "summary": "Revoke a refresh token (end this session)",
+        "summary": "End this session",
         "tags": [
           "auth"
         ]
@@ -2929,6 +2969,12 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "type": "http"
+      },
+      "refreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "crm_rt",
+        "description": "httpOnly refresh-token cookie (set by login/register/refresh)"
       }
     },
     "schemas": {
@@ -3133,16 +3179,17 @@
       "AuthResponse": {
         "type": "object",
         "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque token, valid for 7 days, single use: every refresh returns a new\none. Deprecated in the body (contract v0.6): it is also set as the\nhttpOnly `crm_rt` cookie, and v0.7 removes it from the body.",
+            "deprecated": true
+          },
           "user": {
             "$ref": "#/components/schemas/Me"
           },
           "accessToken": {
             "type": "string",
             "description": "JWT, valid for 15 minutes. Send as `Authorization: Bearer <accessToken>`."
-          },
-          "refreshToken": {
-            "type": "string",
-            "description": "Opaque token, valid for 7 days, single use: every refresh returns a new one."
           },
           "expiresIn": {
             "type": "number",
@@ -3151,9 +3198,9 @@
           }
         },
         "required": [
+          "refreshToken",
           "user",
           "accessToken",
-          "refreshToken",
           "expiresIn"
         ]
       },
@@ -3182,24 +3229,23 @@
         "properties": {
           "refreshToken": {
             "type": "string",
-            "description": "The refresh token returned by login, register or the previous refresh.",
-            "maxLength": 512
+            "description": "Deprecated (contract v0.6): omit it and the API uses the `crm_rt`\nhttpOnly cookie instead. Still accepted for older clients.",
+            "maxLength": 512,
+            "deprecated": true
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "TokenPair": {
         "type": "object",
         "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque token, valid for 7 days, single use: every refresh returns a new\none. Deprecated in the body (contract v0.6): it is also set as the\nhttpOnly `crm_rt` cookie, and v0.7 removes it from the body.",
+            "deprecated": true
+          },
           "accessToken": {
             "type": "string",
             "description": "JWT, valid for 15 minutes. Send as `Authorization: Bearer <accessToken>`."
-          },
-          "refreshToken": {
-            "type": "string",
-            "description": "Opaque token, valid for 7 days, single use: every refresh returns a new one."
           },
           "expiresIn": {
             "type": "number",
@@ -3208,8 +3254,8 @@
           }
         },
         "required": [
-          "accessToken",
           "refreshToken",
+          "accessToken",
           "expiresIn"
         ]
       },
@@ -4256,6 +4302,8 @@
           }
         },
         "required": [
+          "leadsByStatus",
+          "commissionByStatus",
           "conversionRate",
           "disbursedAmount",
           "leadsPerDay"
