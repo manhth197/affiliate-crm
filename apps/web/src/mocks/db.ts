@@ -9,7 +9,7 @@ export type MockDb = SeedData & {
 }
 
 // Bump the version when the shape changes, so stale saved data is ignored.
-const STORAGE_KEY = 'affiliate-crm.mockDb.v2'
+const STORAGE_KEY = 'affiliate-crm.mockDb.v3'
 
 function freshDb(): MockDb {
   return { ...createSeed(), sessions: {} }
@@ -23,7 +23,15 @@ export function resetDb() {
 }
 
 // ---- Browser persistence (mock mode only), so data survives a page reload ----
-export function loadPersistedDb() {
+let persistence = false
+
+/** Load saved data and save after every write from now on (browser mock mode only). */
+export function enablePersistence() {
+  persistence = true
+  loadPersistedDb()
+}
+
+function loadPersistedDb() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) Object.assign(db, JSON.parse(raw) as MockDb)
@@ -32,7 +40,9 @@ export function loadPersistedDb() {
   }
 }
 
+/** No-op unless persistence is enabled (so tests never touch storage). */
 export function persistDb() {
+  if (!persistence) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db))
   } catch {

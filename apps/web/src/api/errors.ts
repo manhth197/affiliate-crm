@@ -35,6 +35,8 @@ const MESSAGES_BY_CODE: Record<ApiErrorCode, string> = {
   DISBURSED_AMOUNT_REQUIRED: 'Cần có số tiền giải ngân để chuyển sang “Đã giải ngân”.',
   INVALID_COMMISSION_STATUS:
     'Hoa hồng này không còn ở trạng thái cho phép thao tác. Vui lòng tải lại.',
+  INVALID_PAYOUT_STATUS:
+    'Kỳ chi trả này không còn ở trạng thái cho phép thao tác. Vui lòng tải lại.',
 }
 
 const MESSAGES_BY_STATUS: Record<number, string> = {

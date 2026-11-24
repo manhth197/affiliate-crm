@@ -1,10 +1,10 @@
 import { setupWorker } from 'msw/browser'
-import { loadPersistedDb, persistDb } from './db'
+import { enablePersistence, persistDb } from './db'
 import { handlers } from './handlers'
 
 /** Start the Service Worker that answers API calls in the browser (mock mode). */
 export async function startMockWorker() {
-  loadPersistedDb()
+  enablePersistence()
   const worker = setupWorker(...handlers)
 
   // Keep mock data across reloads: save after every mocked write.

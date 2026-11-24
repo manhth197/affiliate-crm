@@ -89,7 +89,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update my profile
+         * @description bankName / bankAccountNumber are for affiliates only (403 otherwise). The account number is only ever returned masked.
+         */
+        patch: operations["Auth_updateMe"];
         trace?: never;
     };
     "/api/v1/users": {
@@ -391,6 +395,120 @@ export interface paths {
         patch: operations["Commissions_cancel"];
         trace?: never;
     };
+    "/api/v1/payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List payouts
+         * @description Affiliates only see their own (affiliateId is ignored).
+         */
+        get: operations["Payouts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate DRAFT payouts for a month (background job)
+         * @description Groups APPROVED commissions created in the month (Vietnam calendar) per affiliate. Safe to run again: DRAFT payouts are topped up, CONFIRMED/PAID ones are left alone.
+         */
+        post: operations["Payouts_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** DRAFT → CONFIRMED (admin) */
+        patch: operations["Payouts_confirm"];
+        trace?: never;
+    };
+    "/api/v1/payouts/{id}/mark-paid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * CONFIRMED → PAID (admin)
+         * @description Also marks its commissions PAID and notifies the affiliate.
+         */
+        patch: operations["Payouts_markPaid"];
+        trace?: never;
+    };
+    "/api/v1/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pipeline and commission overview for [from, to)
+         * @description Defaults to the last 30 Vietnam calendar days. Max range 366 days.
+         */
+        get: operations["Reports_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/top-affiliates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Best affiliates in [from, to) */
+        get: operations["Reports_topAffiliates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications": {
         parameters: {
             query?: never;
@@ -487,7 +605,7 @@ export interface components {
          * @description Machine-readable code on business errors (403 disabled account, 409, 422).
          * @enum {string}
          */
-        ErrorCode: "ACCOUNT_DISABLED" | "EMAIL_TAKEN" | "DUPLICATE_LEAD" | "INVALID_TRANSITION" | "CONCURRENT_UPDATE" | "PRODUCT_UNAVAILABLE" | "AMOUNT_NOT_ALLOWED" | "ASSIGNEE_NOT_STAFF" | "CANNOT_DISABLE_SELF" | "DISBURSED_AMOUNT_REQUIRED" | "INVALID_COMMISSION_STATUS";
+        ErrorCode: "ACCOUNT_DISABLED" | "EMAIL_TAKEN" | "DUPLICATE_LEAD" | "INVALID_TRANSITION" | "CONCURRENT_UPDATE" | "PRODUCT_UNAVAILABLE" | "AMOUNT_NOT_ALLOWED" | "ASSIGNEE_NOT_STAFF" | "CANNOT_DISABLE_SELF" | "DISBURSED_AMOUNT_REQUIRED" | "INVALID_COMMISSION_STATUS" | "INVALID_PAYOUT_STATUS";
         ErrorDetail: {
             /** @description Dotted path of the invalid field, e.g. "customerPhone". */
             field: string;
@@ -586,6 +704,24 @@ export interface components {
              * @example 900
              */
             expiresIn: number;
+        };
+        UpdateMeRequest: {
+            /**
+             * @description Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).
+             * @example +84 912 345 678
+             */
+            phone?: string;
+            fullName?: string;
+            /**
+             * @description AFFILIATE only.
+             * @example Vietcombank
+             */
+            bankName?: string;
+            /**
+             * @description AFFILIATE only. 6–20 digits; spaces are ignored. Returned only masked.
+             * @example 0123456789
+             */
+            bankAccountNumber?: string;
         };
         User: {
             /** Format: uuid */
@@ -869,6 +1005,88 @@ export interface components {
             reason: string;
         };
         /** @enum {string} */
+        PayoutStatus: "DRAFT" | "CONFIRMED" | "PAID";
+        Payout: {
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["PayoutStatus"];
+            /** Format: date-time */
+            paidAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            affiliate: components["schemas"]["UserRef"];
+            /**
+             * @description Vietnam calendar month.
+             * @example 2026-11
+             */
+            periodMonth: string;
+            /**
+             * @description VND
+             * @example 1500000
+             */
+            totalAmount: number;
+            commissionCount: number;
+        };
+        PaginatedPayouts: {
+            data: components["schemas"]["Payout"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        GeneratePayoutsRequest: {
+            /**
+             * @description Month whose APPROVED commissions are paid out (Vietnam calendar).
+             * @example 2026-11
+             */
+            month: string;
+        };
+        JobAccepted: {
+            /** @description BullMQ job id. */
+            jobId: string;
+        };
+        LeadsPerDay: {
+            /**
+             * @description Vietnam calendar day.
+             * @example 2026-11-24
+             */
+            date: string;
+            count: number;
+        };
+        ReportOverview: {
+            /** @description Number of leads created in [from, to), by current status */
+            leadsByStatus?: {
+                NEW: number;
+                CONTACTED: number;
+                SUBMITTED: number;
+                APPROVED: number;
+                DISBURSED: number;
+                REJECTED: number;
+            };
+            /** @description Commission amounts in VND (sum) for commissions created in [from, to), by status */
+            commissionByStatus?: {
+                PENDING: number;
+                APPROVED: number;
+                PAID: number;
+                CANCELLED: number;
+            };
+            /**
+             * @description DISBURSED ÷ all leads created in the range, 0..1 (4 decimals).
+             * @example 0.2083
+             */
+            conversionRate: number;
+            /** @description VND disbursed for leads created in the range. */
+            disbursedAmount: number;
+            /** @description One entry per Vietnam calendar day in the range (0 when no leads). */
+            leadsPerDay: components["schemas"]["LeadsPerDay"][];
+        };
+        TopAffiliate: {
+            affiliate: components["schemas"]["LeadAffiliate"];
+            /** @description Leads created in the range. */
+            leads: number;
+            /** @description Of those, how many are DISBURSED. */
+            disbursed: number;
+            /** @description VND, commissions created in the range, excluding CANCELLED. */
+            commission: number;
+        };
+        /** @enum {string} */
         NotificationType: "LEAD_STATUS_CHANGED" | "COMMISSION_CREATED" | "PAYOUT_PAID" | "LEAD_ASSIGNED";
         Notification: {
             /** Format: uuid */
@@ -1145,6 +1363,62 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Auth_updateMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2251,6 +2525,338 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Payouts_list: {
+        parameters: {
+            query: {
+                status?: components["schemas"]["PayoutStatus"];
+                month?: string;
+                /** @description Ignored for affiliates (they only see their own payouts). */
+                affiliateId?: string;
+                /** @description 1-based page number. */
+                page: number;
+                /** @description Items per page (max 100). */
+                pageSize: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPayouts"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Payouts_generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GeneratePayoutsRequest"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Payouts_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Payout"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Payouts_markPaid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Payout"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Reports_overview: {
+        parameters: {
+            query?: {
+                /** @description Inclusive. ISO datetime with timezone. Default: start of the Vietnam day 29 days before `to`. */
+                from?: string;
+                /** @description Exclusive. ISO datetime with timezone. Default: now. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOverview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Reports_topAffiliates: {
+        parameters: {
+            query: {
+                /** @description Inclusive. ISO datetime with timezone. Default: start of the Vietnam day 29 days before `to`. */
+                from?: string;
+                /** @description Exclusive. ISO datetime with timezone. Default: now. */
+                to?: string;
+                /** @description 1–50 */
+                limit: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopAffiliate"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

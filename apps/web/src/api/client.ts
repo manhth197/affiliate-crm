@@ -17,7 +17,8 @@ export type RequestOptions = {
 }
 
 export function buildUrl(path: string, query?: Query) {
-  const url = new URL(config.apiUrl + path)
+  // The base may be relative to the page (same-origin deployment behind a reverse proxy).
+  const url = new URL(config.apiUrl + path, globalThis.location?.origin)
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value))
