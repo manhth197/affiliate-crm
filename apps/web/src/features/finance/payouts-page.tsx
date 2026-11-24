@@ -115,7 +115,9 @@ export function PayoutsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="pl-4">Kỳ</TableHead>
-                    {!isAffiliate && <TableHead>Cộng tác viên</TableHead>}
+                    {!isAffiliate && (
+                      <TableHead className="hidden sm:table-cell">Cộng tác viên</TableHead>
+                    )}
                     <TableHead className="hidden text-right sm:table-cell">Số khoản</TableHead>
                     <TableHead className="text-right">Tổng tiền</TableHead>
                     <TableHead>Trạng thái</TableHead>
@@ -132,10 +134,19 @@ export function PayoutsPage() {
                 <TableBody>
                   {payouts.data.data.map((payout) => (
                     <TableRow key={payout.id}>
-                      <TableCell className="pl-4 font-medium">
-                        {formatMonth(payout.periodMonth)}
+                      <TableCell className="pl-4 whitespace-normal">
+                        <div className="font-medium">{formatMonth(payout.periodMonth)}</div>
+                        {!isAffiliate && (
+                          <div className="text-xs text-muted-foreground sm:hidden">
+                            {payout.affiliate.fullName}
+                          </div>
+                        )}
                       </TableCell>
-                      {!isAffiliate && <TableCell>{payout.affiliate.fullName}</TableCell>}
+                      {!isAffiliate && (
+                        <TableCell className="hidden sm:table-cell">
+                          {payout.affiliate.fullName}
+                        </TableCell>
+                      )}
                       <TableCell className="hidden text-right tabular-nums sm:table-cell">
                         {formatNumber(payout.commissionCount)}
                       </TableCell>

@@ -105,9 +105,11 @@ export function CommissionsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="pl-4">Lead</TableHead>
-                    {!isAffiliate && <TableHead>Cộng tác viên</TableHead>}
+                    {!isAffiliate && (
+                      <TableHead className="hidden sm:table-cell">Cộng tác viên</TableHead>
+                    )}
                     <TableHead className="text-right">Số tiền</TableHead>
-                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="hidden sm:table-cell">Trạng thái</TableHead>
                     <TableHead className={cn('hidden sm:table-cell', !isAdmin && 'pr-4')}>
                       Ngày tạo
                     </TableHead>
@@ -121,7 +123,7 @@ export function CommissionsPage() {
                 <TableBody>
                   {commissions.data.data.map((commission) => (
                     <TableRow key={commission.id}>
-                      <TableCell className="pl-4">
+                      <TableCell className="pl-4 whitespace-normal">
                         <Link
                           to={`/leads/${commission.lead.id}`}
                           className="font-medium hover:underline"
@@ -130,13 +132,27 @@ export function CommissionsPage() {
                         </Link>
                         <div className="text-xs text-muted-foreground">
                           {commission.lead.customerName}
+                          {!isAffiliate && (
+                            <span className="sm:hidden">
+                              {' '}
+                              · CTV {commission.affiliate.fullName}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
-                      {!isAffiliate && <TableCell>{commission.affiliate.fullName}</TableCell>}
+                      {!isAffiliate && (
+                        <TableCell className="hidden sm:table-cell">
+                          {commission.affiliate.fullName}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatVnd(commission.amount)}
+                        {/* Phones: the status sits under the amount instead of its own column. */}
+                        <div className="mt-1 sm:hidden">
+                          <CommissionStatusBadge status={commission.status} />
+                        </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <CommissionStatusBadge status={commission.status} />
                       </TableCell>
                       <TableCell

@@ -45,7 +45,7 @@ export function CommissionActions({ commission }: { commission: Commission }) {
           ) : (
             <Check aria-hidden />
           )}
-          Duyệt
+          <span className="hidden sm:inline">Duyệt</span>
         </Button>
       )}
       {canCancel(commission) && (
@@ -56,7 +56,7 @@ export function CommissionActions({ commission }: { commission: Commission }) {
           onClick={() => setCancelling(true)}
         >
           <X aria-hidden />
-          Hủy
+          <span className="hidden sm:inline">Hủy</span>
         </Button>
       )}
       <CancelCommissionDialog

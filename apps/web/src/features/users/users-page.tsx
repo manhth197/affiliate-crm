@@ -125,7 +125,7 @@ export function UsersPage() {
                   <TableRow>
                     <TableHead className="pl-4">Người dùng</TableHead>
                     <TableHead className="hidden md:table-cell">Số điện thoại</TableHead>
-                    <TableHead>Vai trò</TableHead>
+                    <TableHead className="hidden sm:table-cell">Vai trò</TableHead>
                     <TableHead>Trạng thái</TableHead>
                     <TableHead className="hidden md:table-cell">Ngày tạo</TableHead>
                     <TableHead className="pr-4 text-right">
@@ -144,11 +144,15 @@ export function UsersPage() {
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">{user.email}</div>
+                        {/* Phones: the role goes under the email instead of its own column. */}
+                        <div className="text-xs text-muted-foreground sm:hidden">
+                          {ROLE_LABELS[user.role]}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden tabular-nums md:table-cell">
                         {user.phone}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
                       </TableCell>
                       <TableCell>

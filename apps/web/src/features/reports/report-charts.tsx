@@ -14,6 +14,7 @@ import {
  * Chart conventions (dataviz skill): every chart here shows a magnitude, so it uses ONE hue;
  * identity comes from axis labels, never from colour. Thin marks with 4px rounded data ends,
  * a recessive grid, one axis, a hover tooltip, and a table view next to each chart.
+ * No entry animation: it delays the value labels and adds nothing to a report.
  */
 const MARK = 'var(--color-sky-600)'
 const GRID = 'var(--border)'
@@ -65,7 +66,13 @@ export function LeadsPerDayChart({ data }: { data: { date: string; count: number
             )
           }}
         />
-        <Bar dataKey="count" fill={MARK} radius={[4, 4, 0, 0]} maxBarSize={28} />
+        <Bar
+          dataKey="count"
+          fill={MARK}
+          radius={[4, 4, 0, 0]}
+          maxBarSize={28}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -107,7 +114,13 @@ export function CategoryBarChart({
             return <TooltipBox title={row.label} value={formatValue(row.value)} />
           }}
         />
-        <Bar dataKey="value" fill={MARK} radius={[0, 4, 4, 0]} barSize={18}>
+        <Bar
+          dataKey="value"
+          fill={MARK}
+          radius={[0, 4, 4, 0]}
+          barSize={18}
+          isAnimationActive={false}
+        >
           <LabelList
             dataKey="value"
             position="right"
