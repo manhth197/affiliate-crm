@@ -58,7 +58,7 @@ export class PayoutsController {
   @ApiOperation({
     summary: 'Generate DRAFT payouts for a month (background job)',
     description:
-      'Groups APPROVED commissions created in the month (Vietnam calendar) per affiliate. Safe to run again: DRAFT payouts are topped up, CONFIRMED/PAID ones are left alone.',
+      'Per affiliate, puts every APPROVED commission not yet in a payout and created before the end of the month (Vietnam calendar) into the DRAFT payout of that month, so late approvals roll into the next payout. Safe to run again: DRAFT payouts are recalculated, CONFIRMED/PAID ones are never changed.',
   })
   @ApiAcceptedResponse({ type: JobAcceptedDto })
   @ApiErrors(400, 403)

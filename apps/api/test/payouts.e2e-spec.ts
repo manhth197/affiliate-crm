@@ -2,7 +2,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { CommissionsService } from '../src/commissions/commissions.service';
 import { QueueName } from '../src/queues/queues';
-import { vnMonth } from '../src/common/dates';
+import { vnMonth, vnMonthRange } from '../src/common/dates';
 import { LeadStatus, Role } from '../src/generated/prisma/enums';
 import {
   actor,
@@ -59,12 +59,12 @@ describe('Payouts (e2e, BullMQ job + real DB)', () => {
   }
 
   /** Requests generation and waits until the BullMQ job has completed. */
-  async function generate(): Promise<void> {
+  async function generate(forMonth = month): Promise<void> {
     const res = await ctx
       .http()
       .post(`${API}/payouts/generate`)
       .set(...bearer(admin))
-      .send({ month })
+      .send({ month: forMonth })
       .expect(202);
     expect(res.body).toEqual({ jobId: expect.any(String) });
     const queue = ctx.app.get<Queue>(getQueueToken(QueueName.Payouts));
@@ -73,9 +73,9 @@ describe('Payouts (e2e, BullMQ job + real DB)', () => {
     );
   }
 
-  const payoutOf = (affiliateId: string) =>
+  const payoutOf = (affiliateId: string, periodMonth = month) =>
     ctx.prisma.payout.findUnique({
-      where: { affiliateId_periodMonth: { affiliateId, periodMonth: month } },
+      where: { affiliateId_periodMonth: { affiliateId, periodMonth } },
     });
 
   beforeAll(async () => {
@@ -263,5 +263,59 @@ describe('Payouts (e2e, BullMQ job + real DB)', () => {
       .set(...bearer(admin))
       .send({ month: '2026-13' })
       .expect(400);
+  });
+
+  it('rolls a late-approved commission of a PAID month into the next payout (v0.5)', async () => {
+    const ctv3 = await actor(ctx, Role.AFFILIATE, 'Lê Hoàng Cường');
+    const previous = vnMonth(new Date(vnMonthRange(month).gte.getTime() - 1));
+    const inPrevious = new Date(
+      vnMonthRange(previous).gte.getTime() + 5 * 24 * 60 * 60 * 1000,
+    );
+    const backdate = (id: string) =>
+      ctx.prisma.commission.update({
+        where: { id },
+        data: { createdAt: inPrevious },
+      });
+
+    // Last month: one commission, paid out.
+    await backdate(await commission(ctv3, 10_000_000n, true));
+    await generate(previous);
+    const paid = (await payoutOf(ctv3.id, previous))!;
+    for (const step of ['confirm', 'mark-paid']) {
+      await ctx
+        .http()
+        .patch(`${API}/payouts/${paid.id}/${step}`)
+        .set(...bearer(admin))
+        .expect(200);
+    }
+
+    // Another commission from last month is approved only now.
+    const late = await commission(ctv3, 20_000_000n, false);
+    await backdate(late);
+    await ctx
+      .http()
+      .patch(`${API}/commissions/${late}/approve`)
+      .set(...bearer(admin))
+      .expect(200);
+
+    // Re-running last month never touches the PAID payout...
+    await generate(previous);
+    expect(await payoutOf(ctv3.id, previous)).toMatchObject({
+      status: 'PAID',
+      commissionCount: 1,
+      totalAmount: 150_000n,
+    });
+    // ...and this month's payout picks the late commission up.
+    await generate(month);
+    const current = (await payoutOf(ctv3.id, month))!;
+    expect(current).toMatchObject({
+      status: 'DRAFT',
+      commissionCount: 1,
+      totalAmount: 300_000n,
+    });
+    expect(
+      (await ctx.prisma.commission.findUniqueOrThrow({ where: { id: late } }))
+        .payoutId,
+    ).toBe(current.id);
   });
 });

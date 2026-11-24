@@ -72,16 +72,18 @@ export class PayoutsService {
 
   /**
    * Job handler: one DRAFT payout per affiliate for the month, holding every
-   * APPROVED commission created that month and not yet in a payout. Safe to
-   * re-run: UNIQUE(affiliate_id, period_month) keeps one payout, and a DRAFT
-   * is topped up with commissions approved since the last run.
+   * APPROVED commission not yet in a payout and created before the end of
+   * that month (contract v0.5). Late approvals from earlier months therefore
+   * roll into the next payout instead of being left behind. Safe to re-run:
+   * UNIQUE(affiliate_id, period_month) keeps one payout, and a DRAFT is topped
+   * up with commissions approved since the last run.
    */
   async generate(month: string, requestedBy: string): Promise<GenerateResult> {
-    const range = vnMonthRange(month);
+    const endOfMonth = vnMonthRange(month).lt;
     const eligible = {
       status: CommissionStatus.APPROVED,
       payoutId: null,
-      createdAt: range,
+      createdAt: { lt: endOfMonth },
     } satisfies Prisma.CommissionWhereInput;
     const affiliates = await this.prisma.commission.groupBy({
       by: ['affiliateId'],
