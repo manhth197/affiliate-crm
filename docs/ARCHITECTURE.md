@@ -53,6 +53,6 @@ Local ports (chosen so this stack can run next to the RAG project): API 3000, we
 | M1 | Scaffold, Prisma schema + migrations, docker-compose (postgres, redis), auth (register/login/refresh/me), health | Scaffold Vite + Tailwind + shadcn, routing, layout, auth pages, typed API client, MSW mocks from the contract |
 | M2 | Products, leads (CRUD, filters, pagination), status machine, RBAC, PII masking, activities, audit log | Affiliate area: dashboard, leads list + create form, lead detail, commissions, payouts |
 | M3 | BullMQ commission job, notifications (DB + Socket.IO), partner webhook with HMAC | Staff/Admin area: pipeline (table + kanban), lead detail with status change and timeline, products, users |
-| M4 | Payouts job, reports endpoints, seed script, Swagger export | Realtime (socket.io-client), notifications panel, reports dashboard (Recharts), responsive/mobile |
+| M4 | Payouts job, reports endpoints, seed script, Swagger export | Realtime (socket.io-client), notifications panel, reports dashboard (Recharts), admin commissions (approve/cancel) and payouts (generate/confirm/mark paid), responsive/mobile |
 | M5 | Unit + e2e tests, Dockerfile, CI job | Component tests, production build, Dockerfile (nginx), CI job |
 | M6 | Integration on `main`, end-to-end smoke test, README with screenshots, AWS deployment (with owner approval) | |
