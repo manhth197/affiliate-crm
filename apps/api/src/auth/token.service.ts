@@ -14,6 +14,8 @@ import type { JwtPayload } from './auth.types';
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  /** Seconds until the access token expires. */
+  expiresIn: number;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -34,6 +36,7 @@ function newOpaqueToken(): string {
 @Injectable()
 export class TokenService {
   private readonly refreshTtlMs: number;
+  private readonly accessTtlSeconds: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -42,6 +45,9 @@ export class TokenService {
   ) {
     this.refreshTtlMs =
       config.get('REFRESH_TOKEN_TTL_DAYS', { infer: true }) * DAY_MS;
+    this.accessTtlSeconds = config.get('JWT_ACCESS_TTL_SECONDS', {
+      infer: true,
+    });
   }
 
   /** Starts a session (login/register): new access token + new refresh-token family. */
@@ -55,7 +61,11 @@ export class TokenService {
         expiresAt: new Date(Date.now() + this.refreshTtlMs),
       },
     });
-    return { accessToken: await this.signAccessToken(user), refreshToken };
+    return {
+      accessToken: await this.signAccessToken(user),
+      refreshToken,
+      expiresIn: this.accessTtlSeconds,
+    };
   }
 
   /**
@@ -109,6 +119,7 @@ export class TokenService {
     return {
       accessToken: await this.signAccessToken(record.user),
       refreshToken: nextToken,
+      expiresIn: this.accessTtlSeconds,
     };
   }
 

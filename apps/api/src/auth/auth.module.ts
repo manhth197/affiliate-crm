@@ -9,7 +9,6 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
 
 @Module({
@@ -46,7 +45,6 @@ import { TokenService } from './token.service';
   controllers: [AuthController],
   providers: [
     AuthService,
-    PasswordService,
     TokenService,
     // Order matters: authenticate first, then check roles.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
