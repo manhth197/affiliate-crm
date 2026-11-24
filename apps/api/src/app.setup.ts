@@ -50,13 +50,17 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     )
     .setVersion('0.1.0')
     .addBearerAuth()
-    .addCookieAuth('crm_rt', {
-      type: 'apiKey',
-      in: 'cookie',
-      name: 'crm_rt',
-      description:
-        'httpOnly refresh-token cookie (set by login/register/refresh)',
-    })
+    .addCookieAuth(
+      'crm_rt',
+      {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'crm_rt',
+        description:
+          'httpOnly refresh-token cookie (set by login/register/refresh)',
+      },
+      'refreshCookie',
+    )
     .build();
   return SwaggerModule.createDocument(app, config, {
     // "AuthController.login" -> "Auth_login"

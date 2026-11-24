@@ -113,7 +113,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiCookieAuth(REFRESH_COOKIE)
+  @ApiCookieAuth('refreshCookie')
   @ApiOperation({
     summary: 'Exchange a refresh token for a new token pair',
     description:
@@ -169,7 +169,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
-  @ApiCookieAuth(REFRESH_COOKIE)
+  @ApiCookieAuth('refreshCookie')
   @ApiOperation({
     summary: 'End this session',
     description:

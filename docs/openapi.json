@@ -228,7 +228,7 @@
         },
         "security": [
           {
-            "crm_rt": []
+            "refreshCookie": []
           }
         ],
         "summary": "Exchange a refresh token for a new token pair",
@@ -279,7 +279,7 @@
         },
         "security": [
           {
-            "crm_rt": []
+            "refreshCookie": []
           },
           {
             "bearer": []
@@ -2973,7 +2973,7 @@
         "bearerFormat": "JWT",
         "type": "http"
       },
-      "cookie": {
+      "refreshCookie": {
         "type": "apiKey",
         "in": "cookie",
         "name": "crm_rt",
