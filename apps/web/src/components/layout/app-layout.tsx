@@ -1,6 +1,6 @@
 import { Menu } from 'lucide-react'
 import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { Outlet, useNavigation } from 'react-router'
 import { useCurrentUser } from '@/auth/auth-context'
 import { NotificationBell } from '@/features/notifications/notification-bell'
 import { RealtimeBridge } from '@/realtime/realtime-bridge'
@@ -21,6 +21,8 @@ import { UserMenu } from './user-menu'
 export function AppLayout() {
   const user = useCurrentUser()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  // Pages are lazy chunks: show a thin bar while the next one loads.
+  const navigating = useNavigation().state === 'loading'
 
   return (
     <div className="min-h-svh bg-muted/40">
@@ -36,6 +38,13 @@ export function AppLayout() {
 
       <div className="flex min-h-svh flex-col md:pl-60">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur sm:px-6">
+          {navigating && (
+            <div
+              role="progressbar"
+              aria-label="Đang tải trang"
+              className="absolute inset-x-0 bottom-0 h-0.5 animate-pulse bg-primary"
+            />
+          )}
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Mở menu">

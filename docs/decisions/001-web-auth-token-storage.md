@@ -1,22 +1,22 @@
 # 001 (web) — Where the web app keeps auth tokens
 
 ## Context
-The API (contract v0.1–v0.3) returns a JWT access token (15 min) and a refresh token (7 days, rotated on every use) in the JSON body, and expects the refresh token back in the body of `POST /auth/refresh`. So the browser must hold the refresh token somewhere JavaScript can read. Users expect to stay logged in after a reload and when they open a lead in a new tab.
+The API issues a JWT access token (15 min) and a refresh token (7 days, single-use: every refresh rotates it, and reusing an old one revokes the session). Until contract v0.5 the refresh token travelled in JSON bodies, so the web kept it in `localStorage`, where any XSS bug could read it and keep a session alive elsewhere for a week. Since **v0.6** the API also puts it in an **httpOnly cookie** (`crm_rt; Path=/api/v1/auth; SameSite=Strict`).
 
 ## Decision
-- **Access token: in memory only** (a module variable in `src/api/token-store.ts`). It is never written to storage, so it disappears on reload.
-- **Refresh token: `localStorage`**, so the session survives reloads and is shared by tabs.
-- The API client (`src/api/client.ts`) attaches the access token, and on a 401 refreshes **once** and retries. Concurrent 401s share one refresh call (single-flight promise; the contract requires it since v0.2). After a reload it refreshes before the first request.
-- With `expiresIn` (v0.2) the client also refreshes **before** sending when the token has less than 30 s left, so a normal session never sees a 401.
-- Refreshes are serialized across tabs with the **Web Locks API**, and the refresh token is read *inside* the lock. Because tokens rotate, two tabs sending the same token would make the second one fail (and a server with reuse detection would revoke the whole session).
-- A rejected refresh (400/401/403) clears the session and sends the user to `/login` with a toast. 5xx/network errors keep the session.
-- Logout revokes the refresh token on the server (best effort, 3 s timeout), clears tokens and the whole TanStack Query cache. Other tabs follow through the `storage` event.
+- **Access token: in memory only** (`src/api/token-store.ts`), sent as `Authorization: Bearer`. Gone on reload.
+- **Refresh token: the httpOnly cookie only.** JavaScript never sees it. `/auth/login`, `/register`, `/refresh` and `/logout` are called with `credentials: "include"`; refresh and logout send `Content-Type: application/json` with `{}` (cookie-only refresh without JSON → 415). The body's `refreshToken` is ignored (v0.7 removes it).
+- `localStorage` keeps only a **non-secret hint** (`affiliate-crm.session = 1`): a guest does not fire a pointless refresh on every load, and other tabs see log in/out through the `storage` event. The old `affiliate-crm.refreshToken` key is deleted on load (users of the old version log in once more).
+- After a reload the first API call refreshes with the cookie, then proceeds. With `expiresIn`, the client also refreshes 30 s **before** expiry, so normal use never sees a 401.
+- **Single-flight + cross-tab lock:** concurrent 401s share one refresh; the Web Locks API serializes refreshes across tabs, because all tabs share one cookie and a second parallel refresh with the same single-use token would get 401.
+- A rejected refresh (401/403; the API clears the cookie too) ends the session: hint removed, query cache cleared, back to `/login` with a toast. 5xx/network errors keep the session.
 
 ## Alternatives
-- **httpOnly + Secure + SameSite=Strict cookie for the refresh token** — the safest option (JavaScript can never read it), but it needs an API contract change (cookie on `/auth/refresh`, CORS with credentials, CSRF thinking). **Planned next step (M5 hardening, agreed with the coordinator).** The client change is small: send `credentials: 'include'` to `/auth/refresh` and `/auth/logout`, stop storing the token.
-- **sessionStorage** — slightly smaller exposure (one tab), but every new tab asks for login again.
-- **Memory only** — safest without cookies, but every reload logs the user out.
+- **Refresh token in `localStorage`** (what we did until v0.6) — simple, survives reloads, but readable by any XSS.
+- **sessionStorage / memory only** — smaller exposure, but new tabs or reloads log the user out.
+- **Backend-for-frontend with server sessions** — strongest, but adds a component; not needed while web and API are same-site.
 
 ## Consequences
-- An XSS bug could read the refresh token from `localStorage`. Mitigations: React escapes output and we never use `dangerouslySetInnerHTML`; short-lived access tokens; rotation (a stolen token stops working once the real user refreshes); a strict Content-Security-Policy in the nginx config (M5).
-- Token handling lives in one place (`token-store.ts` + `client.ts`), so moving to cookies later touches only those files.
+- XSS can no longer **steal** the refresh token. Script running in the page could still call `/auth/refresh` while the user is there, so output escaping (React), no `dangerouslySetInnerHTML`, and the nginx CSP still matter.
+- Web and API must stay **same-site** (`localhost:5173` → `localhost:3000`, or one domain behind the nginx proxy) for `SameSite=Strict`; cross-site would need `SameSite=None; Secure` + CSRF tokens.
+- The mock API emulates the cookie (MSW's own cookie store is off under Node), so tests cover reload-restores-session, logout, 415 and rotation.

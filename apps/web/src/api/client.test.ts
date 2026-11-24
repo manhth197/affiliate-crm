@@ -3,10 +3,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { db, findUserByEmail } from '@/mocks/db'
 import { api, authenticate } from '@/mocks/http'
 import { server } from '@/mocks/node'
-import { issueTokens } from '@/mocks/tokens'
+import { startMockSession } from '@/mocks/tokens'
 import { apiRequest, onSessionExpired } from './client'
 import { ApiError } from './errors'
-import { tokenStore } from './token-store'
+import {
+  LEGACY_REFRESH_TOKEN_KEY,
+  removeLegacyRefreshToken,
+  SESSION_HINT_KEY,
+  tokenStore,
+} from './token-store'
 
 /** Protected test endpoint that answers with the caller's id. */
 function useWhoAmIEndpoint() {
@@ -28,9 +33,10 @@ function countRefreshCalls() {
   return counter
 }
 
+/** A logged-in browser: refresh cookie + access token (optionally a stale one). */
 function startSession(accessToken?: string) {
   const user = findUserByEmail('ctv1@demo.vn')!
-  const tokens = issueTokens(user.id)
+  const tokens = startMockSession(user.id)
   tokenStore.setTokens({ ...tokens, accessToken: accessToken ?? tokens.accessToken })
   return { user, tokens }
 }
@@ -50,8 +56,8 @@ describe('apiRequest', () => {
 
     await expect(apiRequest('/test/whoami')).resolves.toEqual({ userId: user.id })
     expect(refresh.calls).toBe(1)
-    // The refresh token was rotated: the old one is no longer valid.
-    expect(tokenStore.getRefreshToken()).not.toBe(tokens.refreshToken)
+    // The cookie's token was rotated: the old one is no longer valid.
+    expect(db.refreshCookie).not.toBe(tokens.refreshToken)
     expect(db.sessions[tokens.refreshToken]).toBeUndefined()
   })
 
@@ -74,7 +80,7 @@ describe('apiRequest', () => {
     useWhoAmIEndpoint()
     const user = findUserByEmail('ctv1@demo.vn')!
     // expiresIn below the safety margin: the token must not be used any more.
-    tokenStore.setTokens({ ...issueTokens(user.id), expiresIn: 10 })
+    tokenStore.setTokens({ ...startMockSession(user.id), expiresIn: 10 })
     const refresh = countRefreshCalls()
     const unauthorized: string[] = []
     server.events.on('response:mocked', ({ request, response }) => {
@@ -86,14 +92,37 @@ describe('apiRequest', () => {
     expect(unauthorized).toEqual([])
   })
 
-  it('gets an access token first after a page reload (refresh token only)', async () => {
+  it('restores the session after a page reload from the cookie alone', async () => {
     useWhoAmIEndpoint()
-    const { user, tokens } = startSession()
+    const { user } = startSession()
+    // A reload loses the in-memory access token; the cookie and the hint remain.
     tokenStore.clear()
-    localStorage.setItem('affiliate-crm.refreshToken', tokens.refreshToken)
+    localStorage.setItem(SESSION_HINT_KEY, '1')
 
     await expect(apiRequest('/test/whoami')).resolves.toEqual({ userId: user.id })
     expect(tokenStore.getAccessToken()).not.toBeNull()
+  })
+
+  it('refreshes with the cookie: credentials included, JSON {} body, no token in JS', async () => {
+    useWhoAmIEndpoint()
+    startSession('expired-token')
+    // Look at what the client hands to fetch (MSW's Node interceptor drops `credentials`).
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    await apiRequest('/test/whoami')
+
+    const refreshCall = fetchSpy.mock.calls.find(([url]) => String(url).endsWith('/auth/refresh'))
+    const init = refreshCall?.[1]
+    expect(init).toMatchObject({ method: 'POST', credentials: 'include', body: '{}' })
+    expect(init?.headers).toMatchObject({ 'Content-Type': 'application/json' })
+    // Nothing readable by scripts holds a refresh token.
+    expect(Object.keys(localStorage)).toEqual([SESSION_HINT_KEY])
+  })
+
+  it('removes the refresh token that older versions kept in localStorage', () => {
+    localStorage.setItem(LEGACY_REFRESH_TOKEN_KEY, 'old-token')
+    removeLegacyRefreshToken()
+    expect(localStorage.getItem(LEGACY_REFRESH_TOKEN_KEY)).toBeNull()
   })
 
   it('ends the session when the refresh token is rejected', async () => {
@@ -108,6 +137,7 @@ describe('apiRequest', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).status).toBe(401)
     expect(tokenStore.hasSession()).toBe(false)
+    expect(db.refreshCookie).toBeNull() // the API clears the cookie on a failed refresh
     expect(expired).toHaveBeenCalledOnce()
     unsubscribe()
   })

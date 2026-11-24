@@ -1,11 +1,16 @@
 import type { TokenPair } from './types'
 
 /**
- * Where the tokens live (see docs/decisions/001-web-auth-token-storage.md):
+ * Where the tokens live (contract v0.6, see docs/decisions/001-web-auth-token-storage.md):
  * - access token: module memory only (gone on reload, never written to storage);
- * - refresh token: localStorage, so the session survives reloads and new tabs.
+ * - refresh token: an httpOnly cookie set by the API (`crm_rt`, Path=/api/v1/auth). JavaScript
+ *   never sees it; the API client calls /auth/refresh with `credentials: "include"`.
+ * - localStorage keeps only a non-secret hint that a session probably exists, so a guest does
+ *   not trigger a pointless refresh on every page load, and other tabs learn about log in/out.
  */
-export const REFRESH_TOKEN_KEY = 'affiliate-crm.refreshToken'
+export const SESSION_HINT_KEY = 'affiliate-crm.session'
+/** Where versions before v0.6 kept the refresh token itself; removed on load. */
+export const LEGACY_REFRESH_TOKEN_KEY = 'affiliate-crm.refreshToken'
 
 /** Treat the access token as expired this long before it really expires (slow networks). */
 export const EXPIRY_MARGIN_MS = 30_000
@@ -19,13 +24,19 @@ function emit() {
   listeners.forEach((listener) => listener())
 }
 
-function readRefreshToken(): string | null {
+function storage(): Storage | null {
   try {
-    return localStorage.getItem(REFRESH_TOKEN_KEY)
+    return localStorage
   } catch {
-    return null // storage disabled (privacy mode): behave as logged out
+    return null // storage disabled (privacy mode): sessions end on reload
   }
 }
+
+/** Upgrade from the localStorage-token versions: never leave a refresh token readable by JS. */
+export function removeLegacyRefreshToken() {
+  storage()?.removeItem(LEGACY_REFRESH_TOKEN_KEY)
+}
+removeLegacyRefreshToken()
 
 export const tokenStore = {
   /**
@@ -34,29 +45,27 @@ export const tokenStore = {
    */
   getAccessToken: () =>
     accessToken && Date.now() < accessTokenExpiresAt - EXPIRY_MARGIN_MS ? accessToken : null,
-  getRefreshToken: readRefreshToken,
-  hasSession: () => readRefreshToken() !== null,
 
-  setTokens(tokens: TokenPair) {
+  /** Whether a refresh cookie probably exists (the cookie itself is invisible to JS). */
+  hasSession: () => storage()?.getItem(SESSION_HINT_KEY) === '1',
+
+  /** After login/register/refresh. The body's `refreshToken` (deprecated) is ignored. */
+  setTokens(tokens: Pick<TokenPair, 'accessToken' | 'expiresIn'>) {
     accessToken = tokens.accessToken
     // Fall back to the documented 15 minutes if an older API omits `expiresIn`.
     const lifetimeSeconds = Number.isFinite(tokens.expiresIn) ? tokens.expiresIn : 900
     accessTokenExpiresAt = Date.now() + lifetimeSeconds * 1000
     try {
-      localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken)
+      storage()?.setItem(SESSION_HINT_KEY, '1')
     } catch {
-      // Without storage the session simply ends on reload.
+      // Quota or privacy mode: the session just will not survive a reload.
     }
     emit()
   },
 
   clear() {
     accessToken = null
-    try {
-      localStorage.removeItem(REFRESH_TOKEN_KEY)
-    } catch {
-      // ignore
-    }
+    storage()?.removeItem(SESSION_HINT_KEY)
     emit()
   },
 
@@ -69,10 +78,10 @@ export const tokenStore = {
   },
 }
 
-// Another tab logged in or out: keep this tab in sync.
+// Another tab logged in or out (it changed the hint): keep this tab in sync.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
-    if (event.key !== REFRESH_TOKEN_KEY && event.key !== null) return
+    if (event.key !== SESSION_HINT_KEY && event.key !== null) return
     if (event.newValue === null) accessToken = null
     emit()
   })
