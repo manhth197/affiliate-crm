@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { catalogApi, type ProductQuery } from '@/api/catalog'
 
 export const catalogKeys = {
+  all: ['products'] as const,
   products: (query: ProductQuery = {}) => ['products', query] as const,
   staff: () => ['staff'] as const,
 }

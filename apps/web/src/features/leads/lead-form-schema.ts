@@ -3,7 +3,8 @@ import type { CreateLeadRequest, Product } from '@/api/types'
 import { phoneField } from '@/lib/validation'
 
 export const MIN_LOAN_AMOUNT = 1_000_000
-export const MAX_LOAN_AMOUNT = 10_000_000_000
+/** Same upper bound as the API (CreateLeadRequest.requestedAmount.maximum). */
+export const MAX_LOAN_AMOUNT = 100_000_000_000
 
 /**
  * Create-lead form rules. The schema needs the product list because the requested amount is
@@ -22,9 +23,12 @@ export function createLeadFormSchema(products: readonly Product[]) {
       customerNationalId: z
         .string()
         .trim()
-        .refine((value) => value === '' || /^\d{12}$/.test(value), 'Số CCCD gồm đúng 12 chữ số'),
+        .refine(
+          (value) => value === '' || /^(\d{9}|\d{12})$/.test(value),
+          'Số CMND/CCCD gồm 9 hoặc 12 chữ số',
+        ),
       requestedAmount: z.number().int().optional(),
-      note: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự'),
+      note: z.string().trim().max(1000, 'Ghi chú tối đa 1.000 ký tự'),
     })
     .superRefine((values, ctx) => {
       const product = products.find((p) => p.id === values.productId)
@@ -36,7 +40,7 @@ export function createLeadFormSchema(products: readonly Product[]) {
           : amount < MIN_LOAN_AMOUNT
             ? 'Số tiền tối thiểu là 1.000.000 ₫'
             : amount > MAX_LOAN_AMOUNT
-              ? 'Số tiền tối đa là 10.000.000.000 ₫'
+              ? 'Số tiền tối đa là 100.000.000.000 ₫'
               : null
       if (message) ctx.addIssue({ code: 'custom', path: ['requestedAmount'], message })
     })

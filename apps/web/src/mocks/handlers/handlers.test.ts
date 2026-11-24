@@ -83,11 +83,35 @@ describe('mock API: leads', () => {
     expect(page.data.every((l) => vnDay(l.createdAt) === day)).toBe(true)
   })
 
+  it('filters unassigned leads with assignedStaffId=none', async () => {
+    signInAs('staff@demo.vn')
+    const page = await apiRequest<Paginated<Lead>>('/leads', {
+      query: { assignedStaffId: 'none', pageSize: 100 },
+    })
+    expect(page.meta.total).toBe(db.leads.filter((l) => l.assignedStaffId === null).length)
+    expect(page.data.every((l) => l.assignedStaff === null)).toBe(true)
+  })
+
+  it('sorts by amount with empty amounts last', async () => {
+    signInAs('staff@demo.vn')
+    const page = await apiRequest<Paginated<Lead>>('/leads', {
+      query: { sort: 'requestedAmount:desc', pageSize: 100 },
+    })
+    const amounts = page.data.map((l) => l.requestedAmount)
+    const firstNull = amounts.indexOf(null)
+    const known = amounts.slice(0, firstNull) as number[]
+    expect(known).toEqual([...known].sort((a, b) => b - a))
+    expect(amounts.slice(firstNull).every((a) => a === null)).toBe(true)
+  })
+
   it('answers 400 with details for an invalid filter', async () => {
     signInAs('staff@demo.vn')
     const error = await fail(apiRequest('/leads', { query: { status: 'DONE' } }))
     expect(error.status).toBe(400)
     expect(error.details[0]?.field).toBe('status')
+
+    const badSort = await fail(apiRequest('/leads', { query: { sort: 'customerName:asc' } }))
+    expect(badSort.status).toBe(400)
   })
 
   it("forbids an affiliate from reading another affiliate's lead", async () => {
@@ -111,6 +135,8 @@ describe('mock API: leads', () => {
     signInAs('staff@demo.vn')
     const forStaff = await apiRequest<LeadActivity[]>(`/leads/${lead.id}/activities`)
     expect(forStaff.some((a) => a.type === 'NOTE')).toBe(true)
+    const assigned = forStaff.find((a) => a.type === 'ASSIGNED')
+    expect(assigned?.assignee?.fullName).toBeTruthy()
     const times = forStaff.map((a) => Date.parse(a.createdAt))
     expect(times).toEqual([...times].sort((a, b) => b - a)) // newest first
   })
@@ -165,6 +191,72 @@ describe('mock API: create lead', () => {
     expect(error.status).toBe(403)
   })
 
+  it('blocks a second open lead for the same product and phone (409 DUPLICATE_LEAD)', async () => {
+    signInAs('ctv2@demo.vn') // even a different affiliate
+    const open = db.leads.find((l) => l.status === 'NEW')!
+    const error = await fail(
+      apiRequest('/leads', {
+        method: 'POST',
+        body: {
+          productId: open.productId,
+          customerName: 'Khách trùng',
+          customerPhone: open.customerPhone,
+        },
+      }),
+    )
+    expect(error).toMatchObject({ status: 409, code: 'DUPLICATE_LEAD' })
+    // The message must not reveal who owns the other lead.
+    expect(error.message).not.toContain(open.affiliateId)
+  })
+
+  it('allows a new lead once the old one is closed', async () => {
+    signInAs('ctv1@demo.vn')
+    const closed = db.leads.find((l) => l.status === 'REJECTED')!
+    const product = db.products.find((p) => p.id === closed.productId)!
+    const lead = await apiRequest<Lead>('/leads', {
+      method: 'POST',
+      body: {
+        productId: closed.productId,
+        customerName: 'Khách cũ',
+        customerPhone: closed.customerPhone,
+        ...(product.category === 'LOAN' && { requestedAmount: 20_000_000 }),
+      },
+    })
+    expect(lead.status).toBe('NEW')
+  })
+
+  it('rejects an amount on a non-loan product (422 AMOUNT_NOT_ALLOWED)', async () => {
+    signInAs('ctv1@demo.vn')
+    const card = db.products.find((p) => p.category === 'CREDIT_CARD' && p.active)!
+    const error = await fail(
+      apiRequest('/leads', {
+        method: 'POST',
+        body: {
+          productId: card.id,
+          customerName: 'A',
+          customerPhone: '0912000111',
+          requestedAmount: 5_000_000,
+        },
+      }),
+    )
+    expect(error).toMatchObject({ status: 422, code: 'AMOUNT_NOT_ALLOWED' })
+  })
+
+  it('accepts a 9-digit CMND as well as a 12-digit CCCD', async () => {
+    signInAs('ctv1@demo.vn')
+    const card = db.products.find((p) => p.category === 'CREDIT_CARD' && p.active)!
+    const lead = await apiRequest<Lead>('/leads', {
+      method: 'POST',
+      body: {
+        productId: card.id,
+        customerName: 'A',
+        customerPhone: '0912000222',
+        customerNationalId: '123456789',
+      },
+    })
+    expect(lead.customerNationalId).toBe('******789')
+  })
+
   it('refuses an inactive product with 422', async () => {
     signInAs('ctv1@demo.vn')
     const inactive = db.products.find((p) => !p.active)!
@@ -174,7 +266,7 @@ describe('mock API: create lead', () => {
         body: { productId: inactive.id, customerName: 'A', customerPhone: '0912000111' },
       }),
     )
-    expect(error.status).toBe(422)
+    expect(error).toMatchObject({ status: 422, code: 'PRODUCT_UNAVAILABLE' })
   })
 })
 

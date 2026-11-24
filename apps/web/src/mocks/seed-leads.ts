@@ -214,8 +214,9 @@ export function createLeadSeed(
   const activities: ActivityRecord[] = []
   const commissions: CommissionRecord[] = []
   let activitySeq = 0
-  const addActivity = (activity: Omit<ActivityRecord, 'id'>) =>
-    activities.push({ id: uuid(2, ++activitySeq), ...activity })
+  const addActivity = (
+    activity: Omit<ActivityRecord, 'id' | 'assigneeId'> & { assigneeId?: string },
+  ) => activities.push({ id: uuid(2, ++activitySeq), assigneeId: null, ...activity })
 
   createdTimes.forEach((createdAt, index) => {
     const n = index + 1
@@ -254,6 +255,7 @@ export function createLeadSeed(
         toStatus: null,
         note: null,
         actorId: admin!.id,
+        assigneeId: handler.id,
         createdAt: step(),
       })
     }

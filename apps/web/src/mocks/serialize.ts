@@ -59,6 +59,7 @@ export function toActivity(record: ActivityRecord): LeadActivity {
     toStatus: record.toStatus,
     note: record.note,
     actor: record.actorId ? userRef(record.actorId) : null,
+    assignee: record.assigneeId ? userRef(record.assigneeId) : null,
     createdAt: record.createdAt,
   }
 }

@@ -17,13 +17,16 @@ export function LeadFilters({ products }: LeadFiltersProps) {
   const onSearch = useCallback((q: string) => update({ q }), [update])
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]">
-      <SearchInput
-        label="Tìm lead"
-        placeholder="Tìm theo mã, tên khách hoặc SĐT"
-        value={filters.q}
-        onSearch={onSearch}
-      />
+    // Two columns on phones (search and "clear" take a full row), one row on large screens.
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]">
+      <div className="col-span-2 lg:col-span-1">
+        <SearchInput
+          label="Tìm lead"
+          placeholder="Tìm theo mã, tên khách hoặc SĐT"
+          value={filters.q}
+          onSearch={onSearch}
+        />
+      </div>
       <NativeSelect
         aria-label="Trạng thái"
         className="w-full"
@@ -50,25 +53,24 @@ export function LeadFilters({ products }: LeadFiltersProps) {
           </NativeSelectOption>
         ))}
       </NativeSelect>
-      <Input
-        type="date"
-        aria-label="Từ ngày"
-        title="Từ ngày"
+      <DateFilter
+        label="Từ"
+        ariaLabel="Từ ngày"
         value={filters.fromDay}
-        max={filters.toDay || undefined}
-        onChange={(event) => update({ from: event.target.value })}
+        max={filters.toDay}
+        onChange={(value) => update({ from: value })}
       />
-      <Input
-        type="date"
-        aria-label="Đến ngày"
-        title="Đến ngày"
+      <DateFilter
+        label="Đến"
+        ariaLabel="Đến ngày"
         value={filters.toDay}
-        min={filters.fromDay || undefined}
-        onChange={(event) => update({ to: event.target.value })}
+        min={filters.fromDay}
+        onChange={(value) => update({ to: value })}
       />
       {hasFilters ? (
         <Button
           variant="ghost"
+          className="col-span-2 lg:col-span-1"
           onClick={() => update({ q: '', status: '', productId: '', from: '', to: '' })}
         >
           <X aria-hidden />
@@ -77,6 +79,43 @@ export function LeadFilters({ products }: LeadFiltersProps) {
       ) : (
         <span className="hidden lg:block" />
       )}
+    </div>
+  )
+}
+
+/** Native date input (the phone shows its own picker) with a visible short label inside. */
+function DateFilter({
+  label,
+  ariaLabel,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  ariaLabel: string
+  value: string
+  min?: string
+  max?: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="relative">
+      <span
+        className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-xs text-muted-foreground"
+        aria-hidden
+      >
+        {label}
+      </span>
+      <Input
+        type="date"
+        aria-label={ariaLabel}
+        className="pl-10"
+        value={value}
+        min={min || undefined}
+        max={max || undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   )
 }

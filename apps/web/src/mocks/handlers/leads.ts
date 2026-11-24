@@ -1,13 +1,34 @@
 import { http, HttpResponse } from 'msw'
-import { type CreateLeadRequest, LEAD_STATUSES, type User } from '@/api/types'
+import {
+  type CreateLeadRequest,
+  LEAD_STATUSES,
+  type LeadSortField,
+  type LeadStatus,
+  type User,
+} from '@/api/types'
 import { toLocalPhone, VN_PHONE_REGEX } from '@/lib/validation'
 import { db } from '../db'
-import { api, apiError, authenticate, latency, readJson } from '../http'
+import { api, apiError, authenticate, businessError, latency, readJson } from '../http'
 import { foldText, paginate, readQuery, rejectUnknownProperties, withQueryErrors } from '../query'
 import type { LeadRecord } from '../records'
 import { toActivity, toLead } from '../serialize'
 
-const SORTABLE = ['createdAt', 'updatedAt'] as const
+/** Contract v0.3 sort whitelist. */
+const SORTABLE = [
+  'createdAt',
+  'updatedAt',
+  'requestedAmount',
+  'disbursedAmount',
+] as const satisfies readonly LeadSortField[]
+
+/** Statuses in which a lead still blocks a duplicate (same product + phone). */
+const OPEN_STATUSES: readonly LeadStatus[] = ['NEW', 'CONTACTED', 'SUBMITTED', 'APPROVED']
+
+/** Comparable value for sorting; missing amounts sort last in both directions. */
+function sortValue(lead: LeadRecord, field: LeadSortField): number | null {
+  if (field === 'createdAt' || field === 'updatedAt') return Date.parse(lead[field])
+  return lead[field]
+}
 
 /** Owner, STAFF and ADMIN may read a lead; another affiliate gets 403. */
 function findReadableLead(id: string, viewer: User): LeadRecord | Response {
@@ -50,7 +71,15 @@ export const leadHandlers = [
           if (status && lead.status !== status) return false
           if (productId && lead.productId !== productId) return false
           if (affiliateId && lead.affiliateId !== affiliateId) return false
-          if (assignedStaffId && lead.assignedStaffId !== assignedStaffId) return false
+          // Contract v0.3: "none" means nobody is assigned.
+          if (assignedStaffId === 'none' && lead.assignedStaffId !== null) return false
+          if (
+            assignedStaffId &&
+            assignedStaffId !== 'none' &&
+            lead.assignedStaffId !== assignedStaffId
+          ) {
+            return false
+          }
           const created = Date.parse(lead.createdAt)
           if (from !== undefined && created < from) return false
           if (to !== undefined && created >= to) return false // half-open [from, to)
@@ -63,9 +92,10 @@ export const leadHandlers = [
           return true
         })
         .sort((a, b) => {
-          const field = sortField as (typeof SORTABLE)[number]
-          const diff = Date.parse(a[field]) - Date.parse(b[field])
-          return sortDir === 'asc' ? diff : -diff
+          const field = sortField as LeadSortField
+          const [x, y] = [sortValue(a, field), sortValue(b, field)]
+          if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1
+          return sortDir === 'asc' ? x - y : y - x
         })
 
       const result = paginate(leads, page)
@@ -90,8 +120,9 @@ export const leadHandlers = [
     if (unknown) return unknown
 
     const details: { field: string; message: string }[] = []
-    const product = db.products.find((p) => p.id === body.productId)
-    if (!product) details.push({ field: 'productId', message: 'productId must be a valid product' })
+    if (typeof body.productId !== 'string' || !body.productId) {
+      details.push({ field: 'productId', message: 'productId must be a UUID' })
+    }
     if (!body.customerName?.trim()) {
       details.push({ field: 'customerName', message: 'customerName should not be empty' })
     }
@@ -99,8 +130,11 @@ export const leadHandlers = [
     if (!VN_PHONE_REGEX.test(phone)) {
       details.push({ field: 'customerPhone', message: 'must be a valid VN phone number' })
     }
-    if (body.customerNationalId !== undefined && !/^\d{12}$/.test(body.customerNationalId)) {
-      details.push({ field: 'customerNationalId', message: 'must be 12 digits' })
+    if (
+      body.customerNationalId !== undefined &&
+      !/^(\d{9}|\d{12})$/.test(body.customerNationalId)
+    ) {
+      details.push({ field: 'customerNationalId', message: 'must be 9 or 12 digits' })
     }
     if (
       body.requestedAmount !== undefined &&
@@ -109,14 +143,34 @@ export const leadHandlers = [
       details.push({ field: 'requestedAmount', message: 'must be a positive integer' })
     }
     if (details.length > 0) return apiError(400, 'Validation failed', details)
-    if (!product!.active) return apiError(422, 'Product is not active')
+
+    // Contract v0.3 business rules.
+    const product = db.products.find((p) => p.id === body.productId)
+    if (!product || !product.active) {
+      return businessError(422, 'PRODUCT_UNAVAILABLE', 'Product is not available')
+    }
+    if (body.requestedAmount !== undefined && product.category !== 'LOAN') {
+      return businessError(422, 'AMOUNT_NOT_ALLOWED', 'requestedAmount is only for LOAN products')
+    }
+    const duplicate = db.leads.some(
+      (l) =>
+        l.productId === product.id && l.customerPhone === phone && OPEN_STATUSES.includes(l.status),
+    )
+    if (duplicate) {
+      // Generic on purpose: never reveal which affiliate owns the other lead.
+      return businessError(
+        409,
+        'DUPLICATE_LEAD',
+        'This customer already has an open lead for this product',
+      )
+    }
 
     const now = new Date().toISOString()
     const lead: LeadRecord = {
       id: crypto.randomUUID(),
       code: `LD-${String(db.leads.length + 1).padStart(6, '0')}`,
       affiliateId: auth.user.id,
-      productId: product!.id,
+      productId: product.id,
       customerName: body.customerName!.trim(),
       customerPhone: phone,
       customerNationalId: body.customerNationalId ?? null,
@@ -136,6 +190,7 @@ export const leadHandlers = [
       toStatus: 'NEW',
       note: body.note?.trim() || null,
       actorId: auth.user.id,
+      assigneeId: null,
       createdAt: now,
     })
     return HttpResponse.json(toLead(lead, auth.user), { status: 201 })

@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import type { AuthResponse, LoginRequest, RegisterRequest, TokenPair, User } from '@/api/types'
 import { toLocalPhone, VN_PHONE_REGEX } from '@/lib/validation'
 import { db, findUserByEmail, findUserById, nextReferralCode, toMe } from '../db'
-import { api, apiError, authenticate, latency, readJson } from '../http'
+import { api, apiError, authenticate, businessError, latency, readJson } from '../http'
 import { rejectUnknownProperties } from '../query'
 import { issueTokens, revokeRefreshToken, rotateRefreshToken } from '../tokens'
 
@@ -31,7 +31,7 @@ export const authHandlers = [
       details.push({ field: 'phone', message: 'must be a valid VN phone number' })
     }
     if (details.length > 0) return apiError(400, 'Validation failed', details)
-    if (findUserByEmail(email)) return apiError(409, 'Email already registered')
+    if (findUserByEmail(email)) return businessError(409, 'EMAIL_TAKEN', 'Email already registered')
 
     const user: User = {
       id: crypto.randomUUID(),
@@ -67,7 +67,9 @@ export const authHandlers = [
     if (!user || db.passwords[user.id] !== body.password) {
       return apiError(401, 'Invalid email or password')
     }
-    if (user.status !== 'ACTIVE') return apiError(403, 'Account is disabled')
+    if (user.status !== 'ACTIVE') {
+      return businessError(403, 'ACCOUNT_DISABLED', 'Account is disabled')
+    }
     return HttpResponse.json<AuthResponse>({ user: toMe(user), ...issueTokens(user.id) })
   }),
 
@@ -80,7 +82,7 @@ export const authHandlers = [
     const session = body.refreshToken ? db.sessions[body.refreshToken] : undefined
     if (session && findUserById(session.userId)?.status === 'DISABLED') {
       revokeRefreshToken(body.refreshToken!)
-      return apiError(403, 'Account is disabled')
+      return businessError(403, 'ACCOUNT_DISABLED', 'Account is disabled')
     }
     const tokens = body.refreshToken ? rotateRefreshToken(body.refreshToken) : null
     if (!tokens) return apiError(401, 'Invalid refresh token')

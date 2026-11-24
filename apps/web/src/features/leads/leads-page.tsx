@@ -67,7 +67,17 @@ export function LeadsPage() {
             {leads.isPending ? (
               <LeadListSkeleton />
             ) : leads.data.data.length === 0 ? (
-              hasFilters ? (
+              leads.data.meta.total > 0 ? (
+                // e.g. ?page=9 from an old link after the list got shorter
+                <EmptyState
+                  title="Trang này không còn dữ liệu"
+                  action={
+                    <Button variant="outline" onClick={() => update({ page: null })}>
+                      Về trang đầu
+                    </Button>
+                  }
+                />
+              ) : hasFilters ? (
                 <EmptyState
                   title="Không có lead nào khớp bộ lọc"
                   description="Thử bỏ bớt điều kiện lọc hoặc tìm với từ khóa khác."
@@ -98,7 +108,7 @@ export function LeadsPage() {
           </Card>
         )}
 
-        {leads.data && leads.data.meta.total > 0 && (
+        {leads.data && leads.data.data.length > 0 && (
           <PaginationBar
             page={page}
             pageSize={LEADS_PAGE_SIZE}

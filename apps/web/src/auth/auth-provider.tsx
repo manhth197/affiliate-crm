@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { authApi } from '@/api/auth'
 import { onSessionExpired } from '@/api/client'
 import { tokenStore } from '@/api/token-store'
-import type { LoginRequest, Me, RegisterRequest } from '@/api/types'
+import type { AuthResponse, LoginRequest, RegisterRequest } from '@/api/types'
 import { AuthContext, type AuthStatus, ME_QUERY_KEY } from './auth-context'
 
 const LOGOUT_TIMEOUT_MS = 3000
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const startSession = useCallback(
-    (response: { user: Me; accessToken: string; refreshToken: string }) => {
+    (response: AuthResponse) => {
       // Fill the cache first so flipping `hasSession` does not trigger an extra /auth/me call.
       queryClient.setQueryData(ME_QUERY_KEY, response.user)
       tokenStore.setTokens(response)

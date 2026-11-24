@@ -18,23 +18,33 @@ const ICONS: Record<LeadActivityType, LucideIcon> = {
   WEBHOOK: Building2,
 }
 
-function describe(activity: LeadActivity, partnerName: string): { title: string; actor: string } {
+type Described = { title: string; actor: string; note: string | null }
+
+function describe(activity: LeadActivity, partnerName: string): Described {
   const transition =
     activity.fromStatus && activity.toStatus
       ? `${LEAD_STATUS_LABELS[activity.fromStatus]} → ${LEAD_STATUS_LABELS[activity.toStatus]}`
       : ''
   const actor = activity.actor?.fullName ?? `Đối tác ${partnerName}`
+  const note = activity.note
   switch (activity.type) {
     case 'CREATED':
-      return { title: 'Tạo lead', actor }
+      return { title: 'Tạo lead', actor, note }
     case 'STATUS_CHANGED':
-      return { title: `Chuyển trạng thái: ${transition}`, actor }
+      return { title: `Chuyển trạng thái: ${transition}`, actor, note }
     case 'WEBHOOK':
-      return { title: `Đối tác cập nhật: ${transition}`, actor: `Đối tác ${partnerName}` }
-    case 'ASSIGNED':
-      return { title: 'Phân công nhân viên phụ trách', actor }
+      return { title: `Đối tác cập nhật: ${transition}`, actor: `Đối tác ${partnerName}`, note }
+    case 'ASSIGNED': {
+      // Contract v0.3 has `assignee`; the current API export puts the assignee's name in `note`.
+      const assignee = activity.assignee?.fullName ?? note
+      return {
+        title: assignee ? `Phân công cho ${assignee}` : 'Phân công nhân viên phụ trách',
+        actor,
+        note: activity.assignee ? note : null,
+      }
+    }
     case 'NOTE':
-      return { title: 'Ghi chú nội bộ', actor }
+      return { title: 'Ghi chú nội bộ', actor, note }
   }
 }
 
@@ -50,7 +60,7 @@ export function LeadTimeline({
     <ol aria-label="Lịch sử xử lý" className="relative space-y-5">
       {activities.map((activity, index) => {
         const Icon = ICONS[activity.type]
-        const { title, actor } = describe(activity, partnerName)
+        const { title, actor, note } = describe(activity, partnerName)
         return (
           <li key={activity.id} className="relative flex gap-3">
             {index < activities.length - 1 && (
@@ -70,9 +80,9 @@ export function LeadTimeline({
                   {formatRelative(activity.createdAt)}
                 </time>
               </p>
-              {activity.note && (
+              {note && (
                 <p className="mt-1 rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-line">
-                  {activity.note}
+                  {note}
                 </p>
               )}
             </div>

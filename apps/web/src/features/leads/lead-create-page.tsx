@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, CircleAlert, LoaderCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage, hasErrorCode } from '@/api/errors'
 import type { Product, ProductCategory } from '@/api/types'
 import { QueryErrorAlert } from '@/components/feedback'
 import { FormField } from '@/components/form/form-field'
@@ -22,7 +23,7 @@ import {
 } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
-import { useProducts } from '@/features/catalog/queries'
+import { catalogKeys, useProducts } from '@/features/catalog/queries'
 import { applyServerFieldErrors } from '@/lib/form-errors'
 import { describeCommission, PRODUCT_CATEGORY_LABELS } from '@/lib/labels'
 import {
@@ -82,6 +83,7 @@ const CATEGORY_ORDER: ProductCategory[] = ['LOAN', 'CREDIT_CARD', 'INSURANCE']
 
 function LeadForm({ products }: { products: Product[] }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const createLead = useCreateLead()
   const [formError, setFormError] = useState<string | null>(null)
   const schema = useMemo(() => createLeadFormSchema(products), [products])
@@ -119,11 +121,13 @@ function LeadForm({ products }: { products: Product[] }) {
       void navigate(`/leads/${lead.id}`, { replace: true })
     } catch (error) {
       if (applyServerFieldErrors(error, SERVER_FIELDS, setError)) return
-      setFormError(
-        getErrorMessage(error, {
-          422: 'Sản phẩm này đã ngừng nhận hồ sơ. Vui lòng chọn sản phẩm khác.',
-        }),
-      )
+      if (hasErrorCode(error, 'PRODUCT_UNAVAILABLE')) {
+        // Our product list is stale: reload it so the product disappears from the select.
+        void queryClient.invalidateQueries({ queryKey: catalogKeys.all })
+        setError('productId', { type: 'server', message: getErrorMessage(error) })
+        return
+      }
+      setFormError(getErrorMessage(error))
     }
   })
 
@@ -185,10 +189,10 @@ function LeadForm({ products }: { products: Product[] }) {
         </div>
 
         <TextField
-          label="Số CCCD (không bắt buộc)"
+          label="Số CMND/CCCD (không bắt buộc)"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="12 chữ số"
+          placeholder="9 hoặc 12 chữ số"
           maxLength={12}
           error={errors.customerNationalId}
           {...register('customerNationalId')}

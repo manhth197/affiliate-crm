@@ -1,7 +1,7 @@
 import { ArrowRight, Copy, Plus } from 'lucide-react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
-import type { Me } from '@/api/types'
+import type { LeadQuery, Me } from '@/api/types'
 import { EmptyState, QueryErrorAlert } from '@/components/feedback'
 import { PageHeader } from '@/components/page-header'
 import { LeadStatusBadge } from '@/components/status-badge'
@@ -19,7 +19,7 @@ import { CommissionSummaryCards } from '@/features/finance/commission-summary-ca
 import { useLeads } from '@/features/leads/queries'
 import { formatDateTime, formatRelative } from '@/lib/format'
 
-const RECENT_QUERY = { page: 1, pageSize: 5, sort: 'createdAt:desc' }
+const RECENT_QUERY: LeadQuery = { page: 1, pageSize: 5, sort: 'createdAt:desc' }
 
 export function AffiliateDashboard({ user }: { user: Me }) {
   return (

@@ -5,7 +5,9 @@ import type {
   PayoutStatus,
   ProductCategory,
 } from '@/api/types'
-import { formatNumber, formatVnd } from './format'
+import { formatVnd } from './format'
+
+const percentFormat = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 })
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   NEW: 'Mới',
@@ -38,7 +40,7 @@ export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
 /** PERCENT is in basis points: 150 → "1,5% số tiền giải ngân"; FIXED → "300.000 ₫ / hồ sơ". */
 export function describeCommission(type: CommissionType, value: number): string {
   if (type === 'PERCENT') {
-    return `${formatNumber(value / 100)}% số tiền giải ngân`
+    return `${percentFormat.format(value / 100)}% số tiền giải ngân`
   }
   return `${formatVnd(value)} / hồ sơ thành công`
 }

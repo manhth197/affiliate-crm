@@ -4,7 +4,15 @@ React frontend for the Affiliate CRM: one app for three roles (affiliate, staff,
 
 Stack: Vite 8 · React 19 · TypeScript (strict) · React Router 8 · TanStack Query · react-hook-form + zod · Tailwind CSS 4 + shadcn/ui · MSW · Vitest + Testing Library.
 
-![Login](docs/screenshots/m1-login.png)
+| Affiliate dashboard                                                 | Lead detail                                         | Mobile                                                   |
+| ------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------- |
+| ![Affiliate dashboard](docs/screenshots/m2-affiliate-dashboard.png) | ![Lead detail](docs/screenshots/m2-lead-detail.png) | ![Leads on mobile](docs/screenshots/m2-leads-mobile.png) |
+
+## Features so far
+
+- **Auth** (M1): login, affiliate sign-up, role-based layout and menu, route guards, automatic token refresh.
+- **Affiliate area** (M2): dashboard (commission totals, conversion, recent leads, referral code), leads list with search / status / product / date filters kept in the URL, create-lead form (loan amount only for loans, duplicate-lead message), lead detail with progress stepper and timeline, commissions, payouts. Customer phone and ID are masked for affiliates.
+- Staff and admins already see the same list as a read-only pipeline; actions (status change, assignment, notes, kanban) come in M3.
 
 ## Run it
 
@@ -20,14 +28,15 @@ npm run dev        # against the real API at VITE_API_URL (default http://localh
 
 Open http://localhost:5173. Demo accounts (password `Demo@12345`): `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn`. In dev/mock mode the login page has one-click buttons for them.
 
-| Script                            | What it does                                           |
-| --------------------------------- | ------------------------------------------------------ |
-| `npm run dev` / `dev:mock`        | Dev server (real API / mock API)                       |
-| `npm test`                        | Vitest, once (`test:watch` for watch mode)             |
-| `npm run lint`                    | ESLint                                                 |
-| `npm run typecheck`               | `tsc -b`                                               |
-| `npm run format` / `format:check` | Prettier                                               |
-| `npm run build` / `build:mock`    | Production build to `dist/` (real API / mock API demo) |
+| Script                            | What it does                                                |
+| --------------------------------- | ----------------------------------------------------------- |
+| `npm run dev` / `dev:mock`        | Dev server (real API / mock API)                            |
+| `npm test`                        | Vitest, once (`test:watch` for watch mode)                  |
+| `npm run lint`                    | ESLint                                                      |
+| `npm run typecheck`               | `tsc -b`                                                    |
+| `npm run format` / `format:check` | Prettier                                                    |
+| `npm run build` / `build:mock`    | Production build to `dist/` (real API / mock API demo)      |
+| `npm run gen:api`                 | Regenerate `src/api/schema.gen.ts` from `docs/openapi.json` |
 
 ### Environment variables
 
@@ -42,12 +51,14 @@ Copy `.env.example` to `.env.local`.
 
 ```
 src/
-  api/          typed API client: types from the contract, fetch wrapper, token store, refresh logic
+  api/          typed API client: generated + hand-written types, fetch wrapper, token store, refresh
   auth/         AuthProvider (current user via TanStack Query), route guards, role labels
-  components/   layout (sidebar, topbar, user menu), form fields, shadcn/ui primitives in ui/
-  lib/          formatting (VND, Vietnam time), validation schemas, navigation per role, query client
+  features/     one folder per area: pages, query hooks (TanStack Query keys) and their tests
+    auth/ dashboard/ leads/ finance/ catalog/
+  components/   layout, form fields, status badges, pagination, shadcn/ui primitives in ui/
+  lib/          formatting (VND, Vietnam time), Vietnam calendar helpers, labels, validation, URL state
   mocks/        MSW handlers + in-memory DB seeded like the contract's "Seed data"
-  pages/        route screens
+  pages/        generic screens (placeholder, route error)
   test/         Vitest setup and render helpers
   routes.tsx    route tree with guards
 ```
@@ -66,4 +77,6 @@ Tests render the real app (routes, guards, providers) and talk to the MSW mock A
 
 - Money is VND integers, shown as `1.500.000 ₫`; dates are shown in Vietnam time (`Asia/Ho_Chi_Minh`).
 - UI text in Vietnamese; code, comments and docs in English.
-- API types live in `src/api/types.ts`, written from `docs/api-contract.md`; they will be generated with `openapi-typescript` once `docs/openapi.json` exists.
+- API types: import from `src/api/types.ts` only. It re-exports types generated from `docs/openapi.json` and adds hand-written ones for endpoints not exported yet. See [docs/decisions/004-web-generated-api-types.md](../../docs/decisions/004-web-generated-api-types.md).
+- List filters and the page number live in the URL (`useUrlState`), so they survive reloads and the back button.
+- Business errors are shown by their `code` (contract v0.3) with Vietnamese messages (`src/api/errors.ts`).

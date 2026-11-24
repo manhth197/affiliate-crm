@@ -30,6 +30,8 @@ export type ActivityRecord = {
   note: string | null
   /** null = partner webhook */
   actorId: string | null
+  /** Set on ASSIGNED entries (contract v0.3). */
+  assigneeId: string | null
   createdAt: string
 }
 
