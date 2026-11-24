@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -10,6 +6,7 @@ import type { AppConfig } from '../config/env.validation';
 import { Role, UserStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from './auth.types';
+import { ErrorCode, forbidden } from '../common/errors/error-codes';
 
 export interface TokenPair {
   accessToken: string;
@@ -91,7 +88,7 @@ export class TokenService {
     }
     if (record.user.status !== UserStatus.ACTIVE) {
       await this.revokeFamily(record.familyId, now);
-      throw new ForbiddenException('Account is disabled');
+      throw forbidden(ErrorCode.ACCOUNT_DISABLED, 'Account is disabled');
     }
 
     const nextToken = newOpaqueToken();

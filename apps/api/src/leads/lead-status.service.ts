@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import { LeadActivityType, LeadStatus } from '../generated/prisma/enums';
@@ -12,6 +7,11 @@ import { formatLeadCode } from './lead-code';
 import { LeadEvents, LeadStatusChangedEvent } from './lead.events';
 import { leadInclude, type LeadWithRelations } from './lead.include';
 import { allowedTransitions, canTransition } from './lead-status.machine';
+import {
+  conflict,
+  ErrorCode,
+  unprocessable,
+} from '../common/errors/error-codes';
 
 /** Who asked for the change: a logged-in staff member or a partner webhook. */
 export type StatusChangeSource =
@@ -43,7 +43,8 @@ export class LeadStatusService {
   async changeStatus(request: StatusChangeRequest): Promise<LeadWithRelations> {
     const { leadId, to, source } = request;
     if (to === LeadStatus.DISBURSED && request.disbursedAmount === undefined) {
-      throw new UnprocessableEntityException(
+      throw unprocessable(
+        ErrorCode.DISBURSED_AMOUNT_REQUIRED,
         'disbursedAmount is required when status is DISBURSED',
       );
     }
@@ -58,7 +59,10 @@ export class LeadStatusService {
         throw new NotFoundException('Lead not found');
       }
       if (!canTransition(current.status, to)) {
-        throw new ConflictException(transitionError(current.status, to));
+        throw conflict(
+          ErrorCode.INVALID_TRANSITION,
+          transitionError(current.status, to),
+        );
       }
 
       // Optimistic concurrency: the update only applies if nobody changed the
@@ -73,7 +77,8 @@ export class LeadStatusService {
         },
       });
       if (count !== 1) {
-        throw new ConflictException(
+        throw conflict(
+          ErrorCode.CONCURRENT_UPDATE,
           'The lead was changed by someone else. Reload and try again.',
         );
       }

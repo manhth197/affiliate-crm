@@ -6,6 +6,7 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { IsIsoDateTime } from '../../common/dates';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
@@ -15,6 +16,7 @@ import {
   DEFAULT_LEAD_SORT,
   LEAD_SORT_FIELDS,
   LEAD_SORT_PATTERN,
+  UNASSIGNED,
 } from '../lead-filters';
 
 export class LeadFiltersDto {
@@ -32,11 +34,14 @@ export class LeadFiltersDto {
   @IsUUID()
   affiliateId?: string;
 
+  /** A staff user id, or `none` for leads nobody has been assigned. */
+  @ApiProperty({ required: false, example: 'none' })
   @IsOptional()
-  @IsUUID()
+  @ValidateIf((dto: LeadFiltersDto) => dto.assignedStaffId !== UNASSIGNED)
+  @IsUUID(undefined, { message: 'must be a UUID or "none"' })
   assignedStaffId?: string;
 
-  /** Customer name, lead code (LD-000123) or phone digits. */
+  /** Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits. */
   @IsOptional()
   @Trim()
   @IsString()

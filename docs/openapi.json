@@ -858,6 +858,17 @@
             }
           },
           {
+            "name": "assignedStaffId",
+            "required": false,
+            "in": "query",
+            "description": "A staff user id, or `none` for leads nobody has been assigned.",
+            "schema": {
+              "format": "uuid",
+              "example": "none",
+              "type": "string"
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -888,19 +899,10 @@
             }
           },
           {
-            "name": "assignedStaffId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "Customer name, lead code (LD-000123) or phone digits.",
+            "description": "Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits.",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -1090,6 +1092,17 @@
             }
           },
           {
+            "name": "assignedStaffId",
+            "required": false,
+            "in": "query",
+            "description": "A staff user id, or `none` for leads nobody has been assigned.",
+            "schema": {
+              "format": "uuid",
+              "example": "none",
+              "type": "string"
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -1120,19 +1133,10 @@
             }
           },
           {
-            "name": "assignedStaffId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
             "name": "q",
             "required": false,
             "in": "query",
-            "description": "Customer name, lead code (LD-000123) or phone digits.",
+            "description": "Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits.",
             "schema": {
               "maxLength": 100,
               "type": "string"
@@ -1719,6 +1723,23 @@
       }
     },
     "schemas": {
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "ACCOUNT_DISABLED",
+          "EMAIL_TAKEN",
+          "DUPLICATE_LEAD",
+          "INVALID_TRANSITION",
+          "CONCURRENT_UPDATE",
+          "PRODUCT_UNAVAILABLE",
+          "AMOUNT_NOT_ALLOWED",
+          "ASSIGNEE_NOT_STAFF",
+          "CANNOT_DISABLE_SELF",
+          "DISBURSED_AMOUNT_REQUIRED",
+          "INVALID_COMMISSION_STATUS"
+        ],
+        "description": "Machine-readable code on business errors (403 disabled account, 409, 422)."
+      },
       "ErrorDetail": {
         "type": "object",
         "properties": {
@@ -1741,6 +1762,14 @@
           "statusCode": {
             "type": "integer",
             "example": 400
+          },
+          "code": {
+            "description": "Machine-readable code on business errors (403 disabled account, 409, 422).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
+            ]
           },
           "error": {
             "type": "string",
@@ -2628,14 +2657,23 @@
               }
             ]
           },
+          "assignee": {
+            "nullable": true,
+            "description": "Set on ASSIGNED entries: who the lead was assigned to.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           },
           "note": {
             "type": "string",
-            "nullable": true,
-            "description": "For ASSIGNED entries: the assignee's full name."
+            "nullable": true
           }
         },
         "required": [
@@ -2645,6 +2683,7 @@
           "fromStatus",
           "toStatus",
           "actor",
+          "assignee",
           "createdAt",
           "note"
         ]

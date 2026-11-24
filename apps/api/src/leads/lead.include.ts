@@ -19,6 +19,7 @@ export type LeadWithRelations = Prisma.LeadGetPayload<{
 
 export const activityInclude = {
   actor: { select: { id: true, fullName: true } },
+  assignee: { select: { id: true, fullName: true } },
 } satisfies Prisma.LeadActivityInclude;
 
 export type ActivityWithActor = Prisma.LeadActivityGetPayload<{

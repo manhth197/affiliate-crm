@@ -135,7 +135,9 @@ describe('Leads (e2e)', () => {
         422,
       );
       expect(inactive.body.message).toBe('Product is not available');
+      expect(inactive.body.code).toBe('PRODUCT_UNAVAILABLE');
       const nonLoan = await submit(ctv1, { productId: card.id }).expect(422);
+      expect(nonLoan.body.code).toBe('AMOUNT_NOT_ALLOWED');
       expect(nonLoan.body.message).toBe(
         'requestedAmount is only allowed for LOAN products',
       );
@@ -169,6 +171,7 @@ describe('Leads (e2e)', () => {
       const dup = await submit(ctv2, {
         customerPhone: `+84 ${phone.slice(1)}`,
       }).expect(409);
+      expect(dup.body.code).toBe('DUPLICATE_LEAD');
       expect(dup.body.message).toBe(
         'This customer already has an open lead for this product',
       );
@@ -237,7 +240,13 @@ describe('Leads (e2e)', () => {
         ),
       ).toBe(true);
 
-      for (const q of [ctv2Lead.code, 'đặng văn', '0977 000']) {
+      for (const q of [
+        ctv2Lead.code,
+        'đặng văn',
+        'dang van tai', // accent-insensitive
+        'ĐẶNG',
+        '0977 000',
+      ]) {
         const res = await ctx
           .http()
           .get(`${API}/leads?q=${encodeURIComponent(q)}`)
@@ -404,6 +413,7 @@ describe('Leads (e2e)', () => {
       expect(res.body).toEqual({
         statusCode: 409,
         error: 'Conflict',
+        code: 'INVALID_TRANSITION',
         message:
           'Cannot change status from NEW to APPROVED; allowed: CONTACTED, REJECTED',
       });
@@ -447,6 +457,12 @@ describe('Leads (e2e)', () => {
         setStatus(lead.id, { status: 'REJECTED' }, admin),
       ]);
       expect([a.status, b.status].sort()).toEqual([200, 409]);
+      const loser = a.status === 409 ? a : b;
+      // Usually CONCURRENT_UPDATE; INVALID_TRANSITION if the winner committed
+      // before the loser even read the lead.
+      expect(['CONCURRENT_UPDATE', 'INVALID_TRANSITION']).toContain(
+        loser.body.code,
+      );
       const activities = await ctx.prisma.leadActivity.count({
         where: { leadId: lead.id, type: 'STATUS_CHANGED' },
       });
@@ -481,7 +497,34 @@ describe('Leads (e2e)', () => {
         where: { leadId: lead.id, type: 'ASSIGNED' },
       });
       expect(assigned).toHaveLength(1);
-      expect(assigned[0].note).toBe('Phạm Thu Hà');
+      expect(assigned[0]).toMatchObject({ assigneeId: staff.id, note: null });
+
+      const timeline = await ctx
+        .http()
+        .get(`${API}/leads/${lead.id}/activities`)
+        .set(...bearer(staff))
+        .expect(200);
+      expect(timeline.body[0]).toMatchObject({
+        type: 'ASSIGNED',
+        assignee: { id: staff.id, fullName: 'Phạm Thu Hà' },
+        actor: { id: admin.id, fullName: 'Lê Quản Trị' },
+      });
+
+      const unassigned = await ctx
+        .http()
+        .get(`${API}/leads?assignedStaffId=none&pageSize=100`)
+        .set(...bearer(staff))
+        .expect(200);
+      const unassignedIds = unassigned.body.data.map(
+        (l: { id: string }) => l.id,
+      );
+      expect(unassignedIds).not.toContain(lead.id);
+      expect(
+        unassigned.body.data.every(
+          (l: { assignedStaff: unknown }) => l.assignedStaff === null,
+        ),
+      ).toBe(true);
+      expect(unassigned.body.meta.total).toBeGreaterThan(0);
 
       const mine = await ctx
         .http()
@@ -505,7 +548,8 @@ describe('Leads (e2e)', () => {
           .patch(`${API}/leads/${lead.id}/assign`)
           .set(...bearer(staff))
           .send({ staffId })
-          .expect(422);
+          .expect(422)
+          .expect((res) => expect(res.body.code).toBe('ASSIGNEE_NOT_STAFF'));
       }
       await ctx
         .http()

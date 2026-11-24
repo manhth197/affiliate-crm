@@ -164,6 +164,7 @@ describe('Users admin and staff directory (e2e)', () => {
         .send({ status: 'DISABLED' })
         .expect(422);
       expect(res.body.message).toBe('You cannot disable your own account');
+      expect(res.body.code).toBe('CANNOT_DISABLE_SELF');
     });
 
     it('404s unknown users', async () => {

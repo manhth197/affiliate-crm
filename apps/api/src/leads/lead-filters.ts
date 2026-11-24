@@ -1,5 +1,6 @@
 import type { AuthUser } from '../auth/auth.types';
 import { dateRange } from '../common/dates';
+import { toSearchText } from '../common/search-text';
 import type { Prisma } from '../generated/prisma/client';
 import { Role } from '../generated/prisma/enums';
 import type { LeadFiltersDto } from './dto/list-leads-query.dto';
@@ -15,6 +16,8 @@ export const LEAD_SORT_PATTERN = new RegExp(
   `^(${LEAD_SORT_FIELDS.join('|')}):(asc|desc)$`,
 );
 export const DEFAULT_LEAD_SORT = 'createdAt:desc';
+/** `assignedStaffId=none` selects leads nobody has been assigned. */
+export const UNASSIGNED = 'none';
 
 /**
  * Builds the Prisma filter for GET /leads and the CSV export.
@@ -30,7 +33,8 @@ export function buildLeadWhere(
       viewer.role === Role.AFFILIATE ? viewer.id : filters.affiliateId,
     status: filters.status,
     productId: filters.productId,
-    assignedStaffId: filters.assignedStaffId,
+    assignedStaffId:
+      filters.assignedStaffId === UNASSIGNED ? null : filters.assignedStaffId,
     createdAt: dateRange(filters.from, filters.to),
     ...(filters.q ? { OR: searchConditions(filters.q) } : {}),
   };
@@ -39,7 +43,7 @@ export function buildLeadWhere(
 /** `q` matches the customer name, the lead code or (part of) the phone number. */
 function searchConditions(q: string): Prisma.LeadWhereInput[] {
   const conditions: Prisma.LeadWhereInput[] = [
-    { customerName: { contains: q, mode: 'insensitive' } },
+    { customerNameSearch: { contains: toSearchText(q) } },
   ];
   const leadNumber = parseLeadCode(q);
   if (leadNumber !== null) {

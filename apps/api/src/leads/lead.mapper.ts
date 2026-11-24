@@ -61,6 +61,9 @@ export function toLeadActivityDto(
     actor: activity.actor
       ? { id: activity.actor.id, fullName: activity.actor.fullName }
       : null,
+    assignee: activity.assignee
+      ? { id: activity.assignee.id, fullName: activity.assignee.fullName }
+      : null,
     createdAt: activity.createdAt.toISOString(),
   };
 }

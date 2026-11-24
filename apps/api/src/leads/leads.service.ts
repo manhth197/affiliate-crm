@@ -1,15 +1,14 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../auth/auth.types';
 import { CSV_BOM, toCsvLine } from '../common/csv';
+import { toSearchText } from '../common/search-text';
 import { type Paginated, pageArgs, toPage } from '../common/dto/pagination.dto';
 import {
   LeadActivityType,
@@ -37,6 +36,11 @@ import {
 import { toLeadActivityDto, toLeadDto } from './lead.mapper';
 import { OPEN_STATUSES } from './lead-status.machine';
 import { LeadStatusService } from './lead-status.service';
+import {
+  conflict,
+  ErrorCode,
+  unprocessable,
+} from '../common/errors/error-codes';
 
 const EXPORT_BATCH_SIZE = 500;
 
@@ -79,13 +83,17 @@ export class LeadsService {
       where: { id: dto.productId },
     });
     if (!product || !product.active) {
-      throw new UnprocessableEntityException('Product is not available');
+      throw unprocessable(
+        ErrorCode.PRODUCT_UNAVAILABLE,
+        'Product is not available',
+      );
     }
     if (
       dto.requestedAmount !== undefined &&
       product.category !== ProductCategory.LOAN
     ) {
-      throw new UnprocessableEntityException(
+      throw unprocessable(
+        ErrorCode.AMOUNT_NOT_ALLOWED,
         'requestedAmount is only allowed for LOAN products',
       );
     }
@@ -103,7 +111,8 @@ export class LeadsService {
         select: { id: true },
       });
       if (duplicate) {
-        throw new ConflictException(
+        throw conflict(
+          ErrorCode.DUPLICATE_LEAD,
           'This customer already has an open lead for this product',
         );
       }
@@ -112,6 +121,7 @@ export class LeadsService {
           affiliateId: affiliate.id,
           productId: product.id,
           customerName: dto.customerName,
+          customerNameSearch: toSearchText(dto.customerName),
           customerPhone: dto.customerPhone,
           customerNationalId: dto.customerNationalId ?? null,
           requestedAmount:
@@ -189,7 +199,8 @@ export class LeadsService {
       staff.status !== UserStatus.ACTIVE ||
       (staff.role !== Role.STAFF && staff.role !== Role.ADMIN)
     ) {
-      throw new UnprocessableEntityException(
+      throw unprocessable(
+        ErrorCode.ASSIGNEE_NOT_STAFF,
         'staffId must be an active STAFF or ADMIN user',
       );
     }
@@ -208,7 +219,7 @@ export class LeadsService {
         data: {
           leadId: id,
           type: LeadActivityType.ASSIGNED,
-          note: staff.fullName,
+          assigneeId: staffId,
           actorId: actor.id,
         },
       });
