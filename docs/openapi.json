@@ -295,6 +295,1380 @@
         ]
       }
     },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "Users_list",
+        "parameters": [
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/UserStatus"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Searches email, full name and phone.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedUsers"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List users (admin)",
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "operationId": "Users_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a STAFF or ADMIN account",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/{id}": {
+      "patch": {
+        "description": "Disabling a user revokes all their refresh tokens. Admins cannot disable themselves (422).",
+        "operationId": "Users_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a user (status, name, phone)",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/staff": {
+      "get": {
+        "operationId": "Staff_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffMember"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Active STAFF and ADMIN users who can be assigned leads",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "description": "Affiliates only see active products.",
+        "operationId": "Products_list",
+        "parameters": [
+          {
+            "name": "active",
+            "required": false,
+            "in": "query",
+            "description": "Ignored for affiliates: they only ever see active products.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ProductCategory"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List products",
+        "tags": [
+          "products"
+        ]
+      },
+      "post": {
+        "operationId": "Products_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a product (admin)",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/v1/products/{id}": {
+      "patch": {
+        "operationId": "Products_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a product (admin)",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/api/v1/leads": {
+      "get": {
+        "description": "Affiliates only get their own leads (affiliateId is ignored) with customer phone and national ID masked.",
+        "operationId": "Leads_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LeadStatus"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "field:direction, field one of createdAt, updatedAt, requestedAmount, disbursedAmount",
+            "schema": {
+              "default": "createdAt:desc",
+              "example": "createdAt:desc",
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "required": false,
+            "in": "query",
+            "description": "Ignored for affiliates (they only see their own leads).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedStaffId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Customer name, lead code (LD-000123) or phone digits.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "createdAt ≥ from. ISO datetime with timezone, e.g. 2026-11-01T00:00:00+07:00",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "createdAt < to (exclusive). ISO datetime with timezone.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedLeads"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List leads (paginated, filterable)",
+        "tags": [
+          "leads"
+        ]
+      },
+      "post": {
+        "operationId": "Leads_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLeadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit a lead (affiliate)",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/export.csv": {
+      "get": {
+        "description": "Same filters and sort as GET /leads; pagination is ignored. UTF-8 with BOM for Excel.",
+        "operationId": "Leads_exportCsv",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LeadStatus"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "field:direction, field one of createdAt, updatedAt, requestedAmount, disbursedAmount",
+            "schema": {
+              "default": "createdAt:desc",
+              "example": "createdAt:desc",
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "required": false,
+            "in": "query",
+            "description": "Ignored for affiliates (they only see their own leads).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "assignedStaffId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Customer name, lead code (LD-000123) or phone digits.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "createdAt ≥ from. ISO datetime with timezone, e.g. 2026-11-01T00:00:00+07:00",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "createdAt < to (exclusive). ISO datetime with timezone.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export leads as CSV (admin)",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/{id}": {
+      "get": {
+        "operationId": "Leads_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a lead (owner, staff, admin)",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/{id}/status": {
+      "patch": {
+        "description": "NEW→CONTACTED→SUBMITTED→APPROVED→DISBURSED, or any open status→REJECTED. Invalid transition or concurrent change → 409.",
+        "operationId": "Leads_changeStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLeadStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Move a lead through the pipeline",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/{id}/assign": {
+      "patch": {
+        "operationId": "Leads_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignLeadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lead"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Assign a lead to a staff member",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/{id}/notes": {
+      "post": {
+        "operationId": "Leads_addNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLeadNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadActivity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add an internal note (not visible to affiliates)",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/v1/leads/{id}/activities": {
+      "get": {
+        "description": "Affiliates do not see NOTE entries.",
+        "operationId": "Leads_activities",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeadActivity"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lead timeline, newest first",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "Health_check",
@@ -531,12 +1905,18 @@
           "refreshToken": {
             "type": "string",
             "description": "Opaque token, valid for 7 days, single use: every refresh returns a new one."
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Seconds until the access token expires.",
+            "example": 900
           }
         },
         "required": [
           "user",
           "accessToken",
-          "refreshToken"
+          "refreshToken",
+          "expiresIn"
         ]
       },
       "LoginRequest": {
@@ -582,11 +1962,691 @@
           "refreshToken": {
             "type": "string",
             "description": "Opaque token, valid for 7 days, single use: every refresh returns a new one."
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Seconds until the access token expires.",
+            "example": 900
           }
         },
         "required": [
           "accessToken",
-          "refreshToken"
+          "refreshToken",
+          "expiresIn"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string",
+            "example": "ctv1@demo.vn"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn An"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0912345678"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "status",
+          "createdAt",
+          "email",
+          "fullName",
+          "phone"
+        ]
+      },
+      "PageMeta": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 20
+          },
+          "total": {
+            "type": "number",
+            "description": "Total number of items across all pages.",
+            "example": 134
+          }
+        },
+        "required": [
+          "page",
+          "pageSize",
+          "total"
+        ]
+      },
+      "PaginatedUsers": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "0987654321",
+            "pattern": "^0[35789]\\d{8}$"
+          },
+          "role": {
+            "enum": [
+              "STAFF",
+              "ADMIN"
+            ],
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "example": "nhanvien2@demo.vn",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "At least 8 characters.",
+            "minLength": 8,
+            "maxLength": 128
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Đỗ Minh Khoa",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "phone",
+          "role",
+          "email",
+          "password",
+          "fullName"
+        ]
+      },
+      "UpdateUserRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Disabling a user also ends all of their sessions.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              }
+            ]
+          },
+          "phone": {
+            "type": "string",
+            "example": "0987654321",
+            "pattern": "^0[35789]\\d{8}$"
+          },
+          "fullName": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "StaffMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "enum": [
+              "STAFF",
+              "ADMIN"
+            ],
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Phạm Thu Hà"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "fullName"
+        ]
+      },
+      "ProductCategory": {
+        "type": "string",
+        "enum": [
+          "LOAN",
+          "CREDIT_CARD",
+          "INSURANCE"
+        ]
+      },
+      "CommissionType": {
+        "type": "string",
+        "enum": [
+          "PERCENT",
+          "FIXED"
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductCategory"
+              }
+            ]
+          },
+          "commissionType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommissionType"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vay tiêu dùng tín chấp"
+          },
+          "partnerName": {
+            "type": "string",
+            "example": "Tài chính An Phát"
+          },
+          "commissionValue": {
+            "type": "number",
+            "description": "PERCENT: basis points (150 = 1.5%). FIXED: VND.",
+            "example": 150
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "commissionType",
+          "createdAt",
+          "name",
+          "partnerName",
+          "commissionValue",
+          "active"
+        ]
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductCategory"
+              }
+            ]
+          },
+          "commissionType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommissionType"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "example": "Vay tiêu dùng tín chấp",
+            "maxLength": 150
+          },
+          "partnerName": {
+            "type": "string",
+            "example": "Tài chính An Phát",
+            "maxLength": 100
+          },
+          "commissionValue": {
+            "type": "number",
+            "description": "PERCENT: basis points, 0–10000 (150 = 1.5%). FIXED: VND, 0–1,000,000,000.",
+            "example": 150,
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Defaults to true."
+          }
+        },
+        "required": [
+          "category",
+          "commissionType",
+          "name",
+          "partnerName",
+          "commissionValue"
+        ]
+      },
+      "UpdateProductRequest": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProductCategory"
+              }
+            ]
+          },
+          "commissionType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommissionType"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "example": "Vay tiêu dùng tín chấp",
+            "maxLength": 150
+          },
+          "partnerName": {
+            "type": "string",
+            "example": "Tài chính An Phát",
+            "maxLength": 100
+          },
+          "commissionValue": {
+            "type": "number",
+            "description": "PERCENT: basis points, 0–10000 (150 = 1.5%). FIXED: VND, 0–1,000,000,000.",
+            "example": 150,
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Defaults to true."
+          }
+        }
+      },
+      "LeadStatus": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "CONTACTED",
+          "SUBMITTED",
+          "APPROVED",
+          "DISBURSED",
+          "REJECTED"
+        ]
+      },
+      "UserRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Phạm Thu Hà"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ]
+      },
+      "LeadAffiliate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn An"
+          },
+          "referralCode": {
+            "type": "string",
+            "example": "CTVDEMA22"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "referralCode"
+        ]
+      },
+      "LeadProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vay tiêu dùng tín chấp"
+          },
+          "partnerName": {
+            "type": "string",
+            "example": "Tài chính An Phát"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "partnerName"
+        ]
+      },
+      "Lead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "assignedStaff": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "code": {
+            "type": "string",
+            "example": "LD-000123"
+          },
+          "affiliate": {
+            "$ref": "#/components/schemas/LeadAffiliate"
+          },
+          "product": {
+            "$ref": "#/components/schemas/LeadProduct"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Hoàng Thị Mai"
+          },
+          "customerPhone": {
+            "type": "string",
+            "description": "Masked for AFFILIATE (first 2 + last 2 digits).",
+            "example": "09******89"
+          },
+          "customerNationalId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Masked for AFFILIATE (last 3 digits).",
+            "example": "*********123"
+          },
+          "requestedAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "VND, loans only.",
+            "example": 50000000
+          },
+          "disbursedAmount": {
+            "type": "number",
+            "nullable": true,
+            "description": "VND, set when the lead is DISBURSED."
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "assignedStaff",
+          "createdAt",
+          "updatedAt",
+          "code",
+          "affiliate",
+          "product",
+          "customerName",
+          "customerPhone",
+          "customerNationalId",
+          "requestedAmount",
+          "disbursedAmount"
+        ]
+      },
+      "PaginatedLeads": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lead"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CreateLeadRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "0987654321",
+            "pattern": "^0[35789]\\d{8}$"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Hoàng Thị Mai",
+            "maxLength": 100
+          },
+          "customerNationalId": {
+            "type": "string",
+            "description": "9-digit CMND or 12-digit CCCD.",
+            "example": "001203004123"
+          },
+          "requestedAmount": {
+            "type": "number",
+            "description": "VND; only for LOAN products.",
+            "example": 50000000,
+            "minimum": 1,
+            "maximum": 100000000000
+          },
+          "note": {
+            "type": "string",
+            "description": "Free text from the affiliate, shown in the timeline.",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "productId",
+          "customerPhone",
+          "customerName"
+        ]
+      },
+      "ChangeLeadStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "disbursedAmount": {
+            "type": "number",
+            "description": "VND. Required when status is DISBURSED, not allowed otherwise.",
+            "minimum": 0,
+            "maximum": 100000000000,
+            "example": 50000000
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "AssignLeadRequest": {
+        "type": "object",
+        "properties": {
+          "staffId": {
+            "type": "string",
+            "description": "An active STAFF or ADMIN user (see GET /staff).",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "staffId"
+        ]
+      },
+      "AddLeadNoteRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "example": "Khách hẹn gọi lại sau 17h",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "LeadActivityType": {
+        "type": "string",
+        "enum": [
+          "CREATED",
+          "STATUS_CHANGED",
+          "ASSIGNED",
+          "NOTE",
+          "WEBHOOK"
+        ]
+      },
+      "LeadActivity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "leadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadActivityType"
+              }
+            ]
+          },
+          "fromStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "toStatus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadStatus"
+              }
+            ]
+          },
+          "actor": {
+            "nullable": true,
+            "description": "Null when the change came from a partner webhook.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "For ASSIGNED entries: the assignee's full name."
+          }
+        },
+        "required": [
+          "id",
+          "leadId",
+          "type",
+          "fromStatus",
+          "toStatus",
+          "actor",
+          "createdAt",
+          "note"
         ]
       },
       "Health": {

@@ -62,6 +62,7 @@ describe('Auth (e2e)', () => {
         },
         accessToken: expect.any(String),
         refreshToken: expect.any(String),
+        expiresIn: 900,
       });
       expect(JSON.stringify(res.body)).not.toContain('passwordHash');
     });
@@ -242,8 +243,10 @@ describe('Auth (e2e)', () => {
       ).body;
       expect(Object.keys(second).sort()).toEqual([
         'accessToken',
+        'expiresIn',
         'refreshToken',
       ]);
+      expect(second.expiresIn).toBe(900);
       expect(second.refreshToken).not.toBe(first.refreshToken);
 
       // The new access token works.

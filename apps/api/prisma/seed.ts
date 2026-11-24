@@ -2,14 +2,18 @@
  * Demo data (see "Seed data" in docs/api-contract.md). Idempotent: safe to run
  * repeatedly with `npm run db:seed`.
  *
- * M1 seeds the demo accounts only; products, leads, commissions and payouts
- * are added in M4.
+ * Seeds demo accounts and products. Leads, commissions and payouts are added
+ * in M4. Partner names are fictional.
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { PrismaClient } from '../src/generated/prisma/client';
-import { Role } from '../src/generated/prisma/enums';
+import {
+  CommissionType,
+  ProductCategory,
+  Role,
+} from '../src/generated/prisma/enums';
 
 const DEMO_PASSWORD = 'Demo@12345';
 
@@ -65,6 +69,58 @@ const USERS: DemoUser[] = [
   },
 ];
 
+/** Fixed ids so re-running the seed updates instead of duplicating. */
+const PRODUCTS = [
+  {
+    id: '01900000-0000-7000-8000-000000000001',
+    name: 'Vay tiêu dùng tín chấp',
+    partnerName: 'Tài chính An Phát',
+    category: ProductCategory.LOAN,
+    commissionType: CommissionType.PERCENT,
+    commissionValue: 150, // 1.5%
+  },
+  {
+    id: '01900000-0000-7000-8000-000000000002',
+    name: 'Vay mua xe trả góp',
+    partnerName: 'Ngân hàng Sao Việt',
+    category: ProductCategory.LOAN,
+    commissionType: CommissionType.PERCENT,
+    commissionValue: 80, // 0.8%
+  },
+  {
+    id: '01900000-0000-7000-8000-000000000003',
+    name: 'Thẻ tín dụng Sao Việt Platinum',
+    partnerName: 'Ngân hàng Sao Việt',
+    category: ProductCategory.CREDIT_CARD,
+    commissionType: CommissionType.FIXED,
+    commissionValue: 500_000,
+  },
+  {
+    id: '01900000-0000-7000-8000-000000000004',
+    name: 'Thẻ tín dụng Hưng Thịnh Cashback',
+    partnerName: 'Ngân hàng Hưng Thịnh',
+    category: ProductCategory.CREDIT_CARD,
+    commissionType: CommissionType.FIXED,
+    commissionValue: 400_000,
+  },
+  {
+    id: '01900000-0000-7000-8000-000000000005',
+    name: 'Bảo hiểm sức khoẻ gia đình',
+    partnerName: 'Bảo hiểm Toàn Tâm',
+    category: ProductCategory.INSURANCE,
+    commissionType: CommissionType.PERCENT,
+    commissionValue: 1_000, // 10%
+  },
+  {
+    id: '01900000-0000-7000-8000-000000000006',
+    name: 'Bảo hiểm xe máy',
+    partnerName: 'Bảo hiểm Toàn Tâm',
+    category: ProductCategory.INSURANCE,
+    commissionType: CommissionType.FIXED,
+    commissionValue: 30_000,
+  },
+];
+
 async function main(): Promise<void> {
   const prisma = new PrismaClient({
     adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -99,8 +155,15 @@ async function main(): Promise<void> {
         },
       });
     }
+    for (const { id, ...product } of PRODUCTS) {
+      await prisma.product.upsert({
+        where: { id },
+        update: product,
+        create: { id, ...product },
+      });
+    }
     console.log(
-      `Seeded ${USERS.length} demo users (password: ${DEMO_PASSWORD})`,
+      `Seeded ${USERS.length} demo users (password: ${DEMO_PASSWORD}) and ${PRODUCTS.length} products`,
     );
   } finally {
     await prisma.$disconnect();

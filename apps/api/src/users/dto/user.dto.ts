@@ -1,4 +1,5 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { PageMetaDto } from '../../common/dto/pagination.dto';
 import { Role, UserStatus } from '../../generated/prisma/enums';
 
 @ApiSchema({ name: 'User' })
@@ -43,4 +44,23 @@ export class AffiliateProfileDto {
 @ApiSchema({ name: 'Me' })
 export class MeDto extends UserDto {
   affiliate?: AffiliateProfileDto;
+}
+
+@ApiSchema({ name: 'PaginatedUsers' })
+export class PaginatedUsersDto {
+  data!: UserDto[];
+  meta!: PageMetaDto;
+}
+
+/** A user who can be assigned leads (GET /staff). */
+@ApiSchema({ name: 'StaffMember' })
+export class StaffMemberDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  /** @example "Phạm Thu Hà" */
+  fullName!: string;
+
+  @ApiProperty({ enum: [Role.STAFF, Role.ADMIN] })
+  role!: 'STAFF' | 'ADMIN';
 }
