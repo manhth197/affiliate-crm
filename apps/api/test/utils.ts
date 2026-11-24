@@ -146,7 +146,7 @@ export async function login(
   ctx: TestContext,
   email: string,
   password = PASSWORD,
-): Promise<{ accessToken: string; refreshToken: string }> {
+): Promise<{ accessToken: string; cookie: string }> {
   const res = await ctx
     .http()
     .post(`${API}/auth/login`)
@@ -154,7 +154,7 @@ export async function login(
     .expect(200);
   return {
     accessToken: res.body.accessToken,
-    refreshToken: res.body.refreshToken,
+    cookie: refreshCookie(res),
   };
 }
 
@@ -222,4 +222,26 @@ export async function advanceLead(
       .send(status === 'DISBURSED' ? { status, disbursedAmount } : { status })
       .expect(200);
   }
+}
+
+/** "crm_rt=<token>" from a response's Set-Cookie: what a browser sends back. */
+export function refreshCookie(res: {
+  headers: Record<string, unknown>;
+}): string {
+  const header = res.headers['set-cookie'] as string[] | undefined;
+  const line = header?.find((l) => l.startsWith('crm_rt='));
+  if (!line) {
+    throw new Error('response has no crm_rt cookie');
+  }
+  return line.split(';')[0];
+}
+
+/** Browser-style refresh (contract v0.7): cookie + JSON content type, empty body. */
+export function refreshWith(ctx: TestContext, cookie: string) {
+  return ctx
+    .http()
+    .post(`${API}/auth/refresh`)
+    .set('Cookie', cookie)
+    .set('Content-Type', 'application/json')
+    .send({});
 }

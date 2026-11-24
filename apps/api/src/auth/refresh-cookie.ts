@@ -2,7 +2,7 @@ import type { CookieOptions, Request } from 'express';
 import { API_PREFIX } from '../app.setup';
 
 /**
- * Refresh token transport (contract v0.6): the refresh token also travels in
+ * Refresh token transport (contract v0.7): the refresh token travels only in
  * an httpOnly cookie, so page JavaScript (and therefore XSS) cannot read it.
  */
 export const REFRESH_COOKIE = 'crm_rt';
@@ -26,25 +26,11 @@ export function refreshCookieOptions(
   };
 }
 
-export interface ResolvedRefreshToken {
-  token: string | undefined;
-  fromCookie: boolean;
-}
-
-/** The body wins when present (old clients); otherwise the cookie is used. */
-export function resolveRefreshToken(
-  bodyToken: string | undefined,
-  request: Request,
-): ResolvedRefreshToken {
-  if (bodyToken) {
-    return { token: bodyToken, fromCookie: false };
-  }
+/** The refresh token from the crm_rt cookie (the only transport since v0.7). */
+export function readRefreshCookie(request: Request): string | undefined {
   const cookies = request.cookies as Record<string, unknown> | undefined;
   const cookie = cookies?.[REFRESH_COOKIE];
-  return {
-    token: typeof cookie === 'string' && cookie !== '' ? cookie : undefined,
-    fromCookie: true,
-  };
+  return typeof cookie === 'string' && cookie !== '' ? cookie : undefined;
 }
 
 /**

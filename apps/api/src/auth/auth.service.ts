@@ -3,7 +3,7 @@ import { UserStatus } from '../generated/prisma/enums';
 import type { MeDto } from '../users/dto/user.dto';
 import { toMeDto } from '../users/user.mapper';
 import { UsersService } from '../users/users.service';
-import type { AuthResponseDto, TokenPairDto } from './dto/auth-response.dto';
+import type { TokenPair } from './token.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { UpdateMeDto } from './dto/update-me.dto';
@@ -11,6 +11,14 @@ import type { AuthUser } from './auth.types';
 import { PasswordService } from '../users/password.service';
 import { TokenService } from './token.service';
 import { conflict, ErrorCode, forbidden } from '../common/errors/error-codes';
+
+/**
+ * What the service hands to the controller. The refresh token is only ever
+ * put in the httpOnly cookie by the controller, never in a response body.
+ */
+export interface AuthSession extends TokenPair {
+  user: MeDto;
+}
 
 @Injectable()
 export class AuthService {
@@ -21,7 +29,7 @@ export class AuthService {
   ) {}
 
   /** Public sign-up is for affiliates only; STAFF/ADMIN accounts are created by an admin. */
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+  async register(dto: RegisterDto): Promise<AuthSession> {
     // Cheap pre-check so a duplicate does not pay for argon2. The unique index
     // still catches a concurrent duplicate (see UsersService.createAffiliate).
     if (await this.users.findByEmail(dto.email)) {
@@ -37,7 +45,7 @@ export class AuthService {
     return { user: toMeDto(user), ...tokens };
   }
 
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(dto: LoginDto): Promise<AuthSession> {
     const user = await this.users.findByEmail(dto.email);
     const passwordOk = user
       ? await this.passwords.verify(user.passwordHash, dto.password)
@@ -53,7 +61,7 @@ export class AuthService {
     return { user: toMeDto(user), ...tokens };
   }
 
-  refresh(refreshToken: string): Promise<TokenPairDto> {
+  refresh(refreshToken: string): Promise<TokenPair> {
     return this.tokens.rotate(refreshToken);
   }
 

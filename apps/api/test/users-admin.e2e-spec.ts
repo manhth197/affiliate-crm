@@ -8,6 +8,7 @@ import {
   createUser,
   login,
   PASSWORD,
+  refreshWith,
   resetDatabase,
   type TestContext,
   uniqueEmail,
@@ -138,11 +139,7 @@ describe('Users admin and staff directory (e2e)', () => {
         fullName: 'Nghỉ việc',
       });
 
-      await ctx
-        .http()
-        .post(`${API}/auth/refresh`)
-        .send({ refreshToken: session.refreshToken })
-        .expect(401);
+      await refreshWith(ctx, session.cookie).expect(401);
       await ctx
         .http()
         .post(`${API}/auth/login`)
