@@ -98,7 +98,8 @@ type Notification = { id: string; type: NotificationType; title: string; body: s
 Refresh token transport (v0.6):
 - `register`, `login` and `refresh` also set the refresh token as a cookie `crm_rt`: `HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800`, plus `Secure` in production (`COOKIE_SECURE=true`).
 - `POST /auth/refresh` and `POST /auth/logout`: the body `refreshToken` is optional; when absent, the API reads the `crm_rt` cookie. `logout` always clears the cookie.
-- Cookie-based calls must send `Content-Type: application/json` (forces a CORS preflight) and use `credentials: "include"`. CORS allows credentials only for the configured web origins.
+- Cookie-based calls must send `Content-Type: application/json` (forces a CORS preflight; send `{}` as the body) and use `credentials: "include"`. A cookie-only refresh without a JSON content type → 415 (the token is not consumed). CORS allows credentials only for the configured web origins.
+- A failed refresh (401/403) also clears the cookie.
 - Transition: responses still include `refreshToken` in the body (deprecated). After the web switches to the cookie, v0.7 removes it from the body, so JavaScript never sees the refresh token (XSS protection).
 
 ### Products
