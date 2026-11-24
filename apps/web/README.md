@@ -14,6 +14,7 @@ Stack: Vite 8 · React 19 · TypeScript (strict) · React Router 8 · TanStack Q
 - **Affiliate area** (M2): dashboard (commission totals, conversion, recent leads, referral code), leads list with search / status / product / date filters kept in the URL, create-lead form (loan amount only for loans, duplicate-lead message), lead detail with progress stepper and timeline, commissions, payouts. Customer phone and ID are masked for affiliates.
 - **Staff and admin** (M3): pipeline as a **kanban board with drag-and-drop** (mouse, touch, keyboard) or a table, filter by assignee (mine / unassigned / person); lead actions (next status with amount or reason, assign, internal notes) with optimistic updates and 409 handling; admin **products** (pause/resume, create/edit commission rules) and **users** (create staff, edit, lock/unlock).
 - **Realtime and admin finance** (M4): live notifications over Socket.IO (bell with unread count, notifications page, toasts that open the lead), lead and payout updates refresh open pages without reload; admin approves/cancels commissions and generates, confirms and pays monthly payouts; reports with Recharts (lazy-loaded); profile page with the affiliate's bank account; tables checked at phone width.
+- **Production** (M5): route-level code splitting, refresh token in an httpOnly cookie, nginx Docker image, Playwright e2e suite, GitHub Actions workflow.
 
 ## Run it
 
@@ -38,6 +39,7 @@ Open http://localhost:5173. Demo accounts (password `Demo@12345`): `admin@demo.v
 | `npm run format` / `format:check` | Prettier                                                    |
 | `npm run build` / `build:mock`    | Production build to `dist/` (real API / mock API demo)      |
 | `npm run gen:api`                 | Regenerate `src/api/schema.gen.ts` from `docs/openapi.json` |
+| `npm run e2e`                     | Playwright end-to-end tests against a running stack (below) |
 
 ### Environment variables
 
@@ -49,9 +51,45 @@ Copy `.env.example` to `.env.local`.
 | `VITE_USE_MOCKS`  | `false`                        | `true` = answer API calls with MSW in the browser |
 | `VITE_SOCKET_URL` | origin of `VITE_API_URL`       | Socket.IO server (namespace `/realtime`)          |
 
+## Docker
+
+```bash
+docker build -t affiliate-crm-web apps/web
+docker run -p 8080:80 -e API_UPSTREAM=http://api:3000 affiliate-crm-web   # on the API's network
+```
+
+nginx serves the build and proxies `/api/` and `/socket.io/` to the API, so the browser sees one origin (no CORS; the refresh cookie is first-party). Security headers (CSP, nosniff, frame denial), long cache for hashed assets, SPA fallback, `/healthz`. See [docs/decisions/007-web-docker-nginx.md](../../docs/decisions/007-web-docker-nginx.md).
+
+| Setting           | Kind      | Default                 | Meaning                                                            |
+| ----------------- | --------- | ----------------------- | ------------------------------------------------------------------ |
+| `VITE_API_URL`    | build arg | `/api/v1`               | API base URL compiled into the app (relative = through this nginx) |
+| `VITE_SOCKET_URL` | build arg | _(empty = same origin)_ | Socket.IO server                                                   |
+| `API_UPSTREAM`    | env       | `http://api:3000`       | Where nginx forwards `/api/` and `/socket.io/`                     |
+| `NGINX_RESOLVER`  | env       | `127.0.0.11`            | DNS for `API_UPSTREAM` (Docker's embedded DNS)                     |
+| `CSP_CONNECT_SRC` | env       | _(empty)_               | Extra origins for CSP `connect-src` (an API on another domain)     |
+
+Container port **80**; health check `GET /healthz`.
+
+## End-to-end tests
+
+`e2e/` holds Playwright specs that drive the real stack with two browsers at once (a new affiliate and staff/admin): login of every role, httpOnly cookie + reload + logout, and lead → kanban → DISBURSED → live notifications → commission approval → payout → reports → bank account. Each run registers a new affiliate, so it can be repeated on the same database.
+
+```bash
+# API on :3000 and `npm run dev` on :5173 (or the Docker image: E2E_BASE_URL=http://localhost:8080)
+npm run e2e
+```
+
+It uses an installed browser (`E2E_CHANNEL=msedge` by default, or `chrome`); browsers are never downloaded.
+
+## CI
+
+`.github/workflows/web.yml` runs on changes to `apps/web/**` or `docs/openapi.json`: the generated API types must match `docs/openapi.json`, then lint, typecheck, format check, Vitest, production build, and a build of the Docker image.
+
 ## Code map
 
 ```
+e2e/            Playwright specs against the real stack
+nginx/          nginx config templates for the Docker image
 src/
   api/          typed API client: generated + hand-written types, fetch wrapper, token store, refresh
   auth/         AuthProvider (current user via TanStack Query), route guards, role labels
@@ -61,14 +99,14 @@ src/
   components/   layout, form fields, status badges, pagination, shadcn/ui primitives in ui/
   lib/          formatting (VND, Vietnam time), Vietnam calendar helpers, labels, validation, URL state
   mocks/        MSW handlers + in-memory DB seeded like the contract's "Seed data"
-  pages/        generic screens (placeholder, route error)
+  pages/        generic screens (route error)
   test/         Vitest setup and render helpers
   routes.tsx    route tree with guards
 ```
 
 ## How auth works
 
-- Access token in memory, refresh token in `localStorage`. On a 401 the client refreshes once (shared by concurrent requests and serialized across tabs) and retries. Details and trade-offs: [docs/decisions/001-web-auth-token-storage.md](../../docs/decisions/001-web-auth-token-storage.md).
+- Access token in memory; refresh token in an httpOnly cookie set by the API (JavaScript never sees it). After a reload the first request restores the session with the cookie. On a 401 (or 30 s before expiry) the client refreshes once — shared by concurrent requests and serialized across tabs — and retries. Details and trade-offs: [docs/decisions/001-web-auth-token-storage.md](../../docs/decisions/001-web-auth-token-storage.md).
 - Route guards: `<RequireAuth>` (redirect to `/login` and back), `<RequireRole>` (403 screen), `<GuestOnly>` (login/register). They are UX only; the API enforces the same rules.
 - The sidebar menu is defined per role in `src/lib/navigation.ts`; a test checks that every menu link opens for its roles.
 
