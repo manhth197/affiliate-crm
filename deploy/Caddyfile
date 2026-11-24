@@ -1,0 +1,38 @@
+# Caddy: automatic HTTPS (Let's Encrypt) for DOMAIN and one-origin routing.
+# DOMAIN and ACME_EMAIL come from deploy/.env.prod via compose.prod.yml.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# REST API and Swagger UI (/api/v1/..., /api/docs) → NestJS.
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Socket.IO (long-polling and WebSocket upgrade) → NestJS.
+	handle /socket.io/* {
+		reverse_proxy api:3000
+	}
+
+	# Everything else → the React app.
+	# TODO(web): needs the `web` service (crm-web Docker image) in compose.prod.yml.
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
