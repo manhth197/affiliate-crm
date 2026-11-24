@@ -7,7 +7,10 @@ import {
   MinLength,
 } from 'class-validator';
 import { Trim, TrimLowercase } from '../../common/validation/transforms';
-import { IsVnPhone, VN_MOBILE_PATTERN } from '../../common/validation/vn-phone';
+import {
+  IsVnPhone,
+  VN_PHONE_API_PROPERTY,
+} from '../../common/validation/vn-phone';
 
 @ApiSchema({ name: 'RegisterRequest' })
 export class RegisterDto {
@@ -30,12 +33,7 @@ export class RegisterDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({
-    description:
-      'VN mobile number. "+84", spaces and dots are accepted and normalised to 0XXXXXXXXX.',
-    example: '0912345678',
-    pattern: VN_MOBILE_PATTERN.source,
-  })
+  @ApiProperty(VN_PHONE_API_PROPERTY)
   @IsVnPhone()
   phone!: string;
 }

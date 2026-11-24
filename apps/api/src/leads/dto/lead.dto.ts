@@ -98,12 +98,15 @@ export class LeadActivityDto {
   @ApiProperty({ enum: LeadStatus, enumName: 'LeadStatus', nullable: true })
   toStatus!: LeadStatus | null;
 
-  /** For ASSIGNED entries: the assignee's full name. */
   note!: string | null;
 
   /** Null when the change came from a partner webhook. */
   @ApiProperty({ type: UserRefDto, nullable: true })
   actor!: UserRefDto | null;
+
+  /** Set on ASSIGNED entries: who the lead was assigned to. */
+  @ApiProperty({ type: UserRefDto, nullable: true })
+  assignee!: UserRefDto | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;

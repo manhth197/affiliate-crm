@@ -7,6 +7,19 @@ const DEFAULT_TEST_DATABASE_URL =
   'postgresql://crm:crm@localhost:5433/affiliate_crm_test';
 const DEFAULT_TEST_REDIS_URL = 'redis://localhost:6380/1';
 
+export const TEST_PARTNERS = [
+  {
+    id: 'an-phat',
+    name: 'Tài chính An Phát',
+    secret: 'test-secret-an-phat-0123456789',
+  },
+  {
+    id: 'sao-viet',
+    name: 'Ngân hàng Sao Việt',
+    secret: 'test-secret-sao-viet-0123456789',
+  },
+];
+
 export function applyTestEnv(): void {
   const databaseUrl =
     process.env.TEST_DATABASE_URL ?? DEFAULT_TEST_DATABASE_URL;
@@ -16,10 +29,18 @@ export function applyTestEnv(): void {
       `Refusing to run e2e tests against "${databaseName}": the database name must end with _test`,
     );
   }
+  const redisUrl = process.env.TEST_REDIS_URL ?? DEFAULT_TEST_REDIS_URL;
+  const redisDb = new URL(redisUrl).pathname.slice(1);
+  if (!/^[1-9]\d*$/.test(redisDb)) {
+    // Global setup runs FLUSHDB, so never point it at the default DB 0.
+    throw new Error(
+      'TEST_REDIS_URL must select a non-zero database, e.g. redis://host:6379/1',
+    );
+  }
   Object.assign(process.env, {
     NODE_ENV: 'test',
     DATABASE_URL: databaseUrl,
-    REDIS_URL: process.env.TEST_REDIS_URL ?? DEFAULT_TEST_REDIS_URL,
+    REDIS_URL: redisUrl,
     JWT_ACCESS_SECRET: 'e2e-test-secret-e2e-test-secret-e2e-test-secret',
     JWT_ACCESS_TTL_SECONDS: '900',
     REFRESH_TOKEN_TTL_DAYS: '7',
@@ -27,5 +48,8 @@ export function applyTestEnv(): void {
     AUTH_THROTTLE_LIMIT: '1000',
     AUTH_THROTTLE_TTL_SECONDS: '60',
     CORS_ORIGINS: 'http://localhost:5173',
+    PARTNER_WEBHOOKS: JSON.stringify(TEST_PARTNERS),
+    // Tests call reconcile() directly instead of waiting for the scheduler.
+    COMMISSION_RECONCILE_MINUTES: '0',
   });
 }

@@ -10,6 +10,7 @@ function lead(overrides: Partial<LeadWithRelations> = {}): LeadWithRelations {
     affiliateId: 'aff-1',
     productId: 'prod-1',
     customerName: 'Hoàng Thị Mai',
+    customerNameSearch: 'hoang thi mai',
     customerPhone: '0912345689',
     customerNationalId: '001203004123',
     requestedAmount: 50_000_000n,
@@ -84,8 +85,10 @@ describe('toLeadActivityDto', () => {
       toStatus: LeadStatus.APPROVED,
       note: null,
       actorId: null,
+      assigneeId: null,
       createdAt: new Date('2026-11-24T10:00:00Z'),
       actor: null,
+      assignee: null,
     };
     expect(toLeadActivityDto(activity)).toEqual({
       id: 'a1',
@@ -95,6 +98,7 @@ describe('toLeadActivityDto', () => {
       toStatus: LeadStatus.APPROVED,
       note: null,
       actor: null,
+      assignee: null,
       createdAt: '2026-11-24T10:00:00.000Z',
     });
   });

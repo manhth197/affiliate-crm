@@ -7,7 +7,10 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Trim } from '../../common/validation/transforms';
-import { IsVnPhone, VN_MOBILE_PATTERN } from '../../common/validation/vn-phone';
+import {
+  IsVnPhone,
+  VN_PHONE_API_PROPERTY,
+} from '../../common/validation/vn-phone';
 import { UserStatus } from '../../generated/prisma/enums';
 
 @ApiSchema({ name: 'UpdateUserRequest' })
@@ -25,11 +28,7 @@ export class UpdateUserDto {
   @MaxLength(100)
   fullName?: string;
 
-  @ApiProperty({
-    required: false,
-    example: '0987654321',
-    pattern: VN_MOBILE_PATTERN.source,
-  })
+  @ApiProperty({ ...VN_PHONE_API_PROPERTY, required: false })
   @IsOptional()
   @IsVnPhone()
   phone?: string;

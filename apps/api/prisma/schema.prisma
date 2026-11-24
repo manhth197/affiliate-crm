@@ -89,15 +89,16 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  affiliateProfile AffiliateProfile?
-  refreshTokens    RefreshToken[]
-  leads            Lead[]            @relation("LeadAffiliate")
-  assignedLeads    Lead[]            @relation("LeadAssignedStaff")
-  leadActivities   LeadActivity[]
-  commissions      Commission[]
-  payouts          Payout[]
-  notifications    Notification[]
-  auditLogs        AuditLog[]
+  affiliateProfile   AffiliateProfile?
+  refreshTokens      RefreshToken[]
+  leads              Lead[]            @relation("LeadAffiliate")
+  assignedLeads      Lead[]            @relation("LeadAssignedStaff")
+  leadActivities     LeadActivity[]    @relation("ActivityActor")
+  assignedActivities LeadActivity[]    @relation("ActivityAssignee")
+  commissions        Commission[]
+  payouts            Payout[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
 
   @@index([role, status])
   @@map("users")
@@ -159,6 +160,8 @@ model Lead {
   affiliateId        String     @map("affiliate_id") @db.Uuid
   productId          String     @map("product_id") @db.Uuid
   customerName       String     @map("customer_name")
+  /// Lower-cased, accent-free copy of customerName for search ("Nguyễn" → "nguyen").
+  customerNameSearch String     @map("customer_name_search")
   customerPhone      String     @map("customer_phone")
   customerNationalId String?    @map("customer_national_id")
   requestedAmount    BigInt?    @map("requested_amount")
@@ -191,10 +194,13 @@ model LeadActivity {
   note       String?
   /// Null when the change came from a partner webhook.
   actorId    String?          @map("actor_id") @db.Uuid
+  /// Set on ASSIGNED entries: who the lead was assigned to.
+  assigneeId String?          @map("assignee_id") @db.Uuid
   createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  lead  Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  actor User? @relation(fields: [actorId], references: [id])
+  lead     Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor    User? @relation("ActivityActor", fields: [actorId], references: [id])
+  assignee User? @relation("ActivityAssignee", fields: [assigneeId], references: [id])
 
   @@index([leadId, createdAt])
   @@map("lead_activities")

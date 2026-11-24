@@ -9,6 +9,7 @@ import {
 import type { Response } from 'express';
 import { STATUS_CODES } from 'node:http';
 import { Prisma } from '../../generated/prisma/client';
+import type { ErrorCode } from './error-codes';
 import type { ErrorDetailDto, ErrorResponseDto } from './error-response.dto';
 
 /**
@@ -66,9 +67,10 @@ function fromHttpException(exception: HttpException): ErrorResponseDto {
   if (typeof response === 'string') {
     return build(status, response);
   }
-  const { message, details } = response as {
+  const { message, details, code } = response as {
     message?: unknown;
     details?: unknown;
+    code?: unknown;
   };
   let text: string;
   if (typeof message === 'string') {
@@ -82,6 +84,7 @@ function fromHttpException(exception: HttpException): ErrorResponseDto {
     status,
     text,
     Array.isArray(details) ? (details as ErrorDetailDto[]) : undefined,
+    typeof code === 'string' ? (code as ErrorCode) : undefined,
   );
 }
 
@@ -89,10 +92,12 @@ function build(
   statusCode: number,
   message: string,
   details?: ErrorDetailDto[],
+  code?: ErrorCode,
 ): ErrorResponseDto {
   return {
     statusCode,
     error: STATUS_CODES[statusCode] ?? 'Error',
+    ...(code ? { code } : {}),
     message,
     ...(details ? { details } : {}),
   };

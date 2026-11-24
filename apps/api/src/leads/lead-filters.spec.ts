@@ -47,7 +47,7 @@ describe('buildLeadWhere', () => {
 
   it('searches name only for plain text', () => {
     expect(buildLeadWhere({ q: 'Mai' }, staff).OR).toEqual([
-      { customerName: { contains: 'Mai', mode: 'insensitive' } },
+      { customerNameSearch: { contains: 'mai' } },
     ]);
   });
 

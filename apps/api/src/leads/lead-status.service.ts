@@ -1,17 +1,18 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
+import type { Prisma } from '../generated/prisma/client';
 import { LeadActivityType, LeadStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatLeadCode } from './lead-code';
 import { LeadEvents, LeadStatusChangedEvent } from './lead.events';
 import { leadInclude, type LeadWithRelations } from './lead.include';
 import { allowedTransitions, canTransition } from './lead-status.machine';
+import {
+  conflict,
+  ErrorCode,
+  unprocessable,
+} from '../common/errors/error-codes';
 
 /** Who asked for the change: a logged-in staff member or a partner webhook. */
 export type StatusChangeSource =
@@ -40,16 +41,26 @@ export class LeadStatusService {
     private readonly events: EventEmitter2,
   ) {}
 
-  async changeStatus(request: StatusChangeRequest): Promise<LeadWithRelations> {
+  /**
+   * @param inTransaction optional extra write that must commit or roll back
+   *   together with the status change (the webhook stores its event id here,
+   *   so a failed change leaves no "already processed" marker behind).
+   */
+  async changeStatus(
+    request: StatusChangeRequest,
+    inTransaction?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<LeadWithRelations> {
     const { leadId, to, source } = request;
     if (to === LeadStatus.DISBURSED && request.disbursedAmount === undefined) {
-      throw new UnprocessableEntityException(
+      throw unprocessable(
+        ErrorCode.DISBURSED_AMOUNT_REQUIRED,
         'disbursedAmount is required when status is DISBURSED',
       );
     }
     const actorId = source.kind === 'user' ? source.userId : null;
 
     const { lead, from } = await this.prisma.$transaction(async (tx) => {
+      await inTransaction?.(tx);
       const current = await tx.lead.findUnique({
         where: { id: leadId },
         select: { status: true },
@@ -58,7 +69,10 @@ export class LeadStatusService {
         throw new NotFoundException('Lead not found');
       }
       if (!canTransition(current.status, to)) {
-        throw new ConflictException(transitionError(current.status, to));
+        throw conflict(
+          ErrorCode.INVALID_TRANSITION,
+          transitionError(current.status, to),
+        );
       }
 
       // Optimistic concurrency: the update only applies if nobody changed the
@@ -73,7 +87,8 @@ export class LeadStatusService {
         },
       });
       if (count !== 1) {
-        throw new ConflictException(
+        throw conflict(
+          ErrorCode.CONCURRENT_UPDATE,
           'The lead was changed by someone else. Reload and try again.',
         );
       }
