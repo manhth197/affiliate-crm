@@ -1,10 +1,12 @@
 # Production stack for ONE small server (EC2 t4g.small, see docs/deploy/aws.md).
-# Everything is served from one domain by Caddy (automatic HTTPS):
-#   https://DOMAIN/            → web (React, nginx)        [TODO: needs the crm-web image]
-#   https://DOMAIN/api/...     → api (NestJS, REST + Swagger at /api/docs)
-#   https://DOMAIN/socket.io/  → api (Socket.IO)
-# One origin means the refresh-token cookie (Secure; SameSite=Strict) just works
-# and CORS is not even needed for the browser app.
+# One domain, two proxies:  browser → Caddy (HTTPS) → web nginx → api
+#   https://DOMAIN/            → web: the React build
+#   https://DOMAIN/api/...     → web nginx → api (REST, Swagger at /api/docs)
+#   https://DOMAIN/socket.io/  → web nginx → api (Socket.IO, WebSocket)
+# Caddy only terminates TLS; all routing and the security headers/CSP live in
+# the web image's nginx, exactly as in the local docker-compose stack, so what
+# was tested locally is what runs here. One origin means the refresh-token
+# cookie (Secure; SameSite=Strict) just works and CORS is not needed.
 #
 # On the server, from the repo checkout:
 #   cd deploy
@@ -32,23 +34,24 @@ services:
       - caddy_data:/data # certificates: keep this volume
       - caddy_config:/config
     depends_on:
-      api:
+      web:
         condition: service_healthy
     mem_limit: 128m
 
-  # TODO(web): enable when apps/web has its Dockerfile (crm-web M5): remove
-  # `profiles` so it starts with the rest. It must be built for this origin:
-  # VITE_API_URL=https://${DOMAIN}/api/v1 and VITE_SOCKET_URL=https://${DOMAIN}
-  # (build args or whatever the web Dockerfile expects). Until then Caddy
-  # answers 502 on "/", while /api and /socket.io work.
+  # apps/web/Dockerfile (crm-web): nginx serves the build and proxies /api and
+  # /socket.io to the API. Default build args (VITE_API_URL=/api/v1, same-origin
+  # Socket.IO) are right for one domain.
   web:
     <<: *restart
-    profiles: ['web']
     build:
       context: ../apps/web
-      args:
-        VITE_API_URL: https://${DOMAIN}/api/v1
-        VITE_SOCKET_URL: https://${DOMAIN}
+    environment:
+      API_UPSTREAM: http://api:3000
+      NGINX_RESOLVER: 127.0.0.11
+      CSP_CONNECT_SRC: ''
+    depends_on:
+      api:
+        condition: service_healthy
     mem_limit: 64m
 
   api:
@@ -65,8 +68,10 @@ services:
       CORS_ORIGINS: https://${DOMAIN}
       # HTTPS only: the refresh-token cookie gets the Secure flag.
       COOKIE_SECURE: 'true'
-      # One proxy (Caddy) in front: rate limits use the real client IP.
-      TRUST_PROXY: '1'
+      # Two proxies in front (Caddy, then the web nginx): Express takes the
+      # client IP from X-Forwarded-For, so /auth rate limits are per user.
+      # Caddy overwrites any client-sent X-Forwarded-For, so it cannot be faked.
+      TRUST_PROXY: '2'
       PARTNER_WEBHOOKS: ${PARTNER_WEBHOOKS:-[]}
       COMMISSION_RECONCILE_MINUTES: '10'
     depends_on:

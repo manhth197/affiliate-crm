@@ -70,9 +70,8 @@ How each estimate was calculated (Singapore On-Demand, 730 hours):
 flowchart LR
   U["Browser"] -->|"HTTPS :443"| C["Caddy<br/>automatic Let's Encrypt"]
   subgraph EC2["EC2 t4g.small (Ubuntu 24.04 arm64, Docker Compose)"]
-    C -->|"/"| W["web (nginx, React build)"]
-    C -->|"/api/*"| A["api (NestJS)"]
-    C -->|"/socket.io/*"| A
+    C -->|"everything"| W["web: nginx<br/>React build + CSP"]
+    W -->|"/api/*, /socket.io/*"| A["api (NestJS)"]
     A --> P[("postgres:16")]
     A --> R[("redis:7, BullMQ")]
     M["migrate (one-off)"] --> P
@@ -82,15 +81,16 @@ flowchart LR
 ```
 
 - **One origin.** The web app, the API and Socket.IO share one domain, so the `crm_rt` cookie can be `Secure; SameSite=Strict` and CORS is not needed for the browser app.
-- **What is exposed.** Only Caddy publishes ports (80 and 443). Postgres and Redis are reachable only inside the Compose network.
-- **Proxy settings.** The API runs with `TRUST_PROXY=1`, so the per-IP rate limit on `/auth` sees the real client IP rather than Caddy's, and with `COOKIE_SECURE=true`.
+- **Who routes.** Caddy only terminates TLS and adds HSTS, then forwards everything to the web container. That container's nginx serves the React build, sets the security headers and CSP, and proxies `/api/*` and `/socket.io/*` to the API. This is the same routing as the local `docker compose --profile app` stack, so what was tested locally is what runs on the server. The cost is one extra hop inside the machine (negligible). The alternative was Caddy routing `/api` itself, which would mean two routing configurations that could drift apart.
+- **What is exposed.** Only Caddy publishes ports (80 and 443). The API, Postgres and Redis are reachable only inside the Compose network.
+- **Proxy settings.** The API runs with `TRUST_PROXY=2` (Caddy + nginx), so the per-IP rate limit on `/auth` sees the real client IP. Caddy replaces any `X-Forwarded-For` sent by the client, so the header cannot be faked. The API also runs with `COOKIE_SECURE=true`.
 
 ## 5. Files
 
 | File | Purpose |
 |---|---|
-| [`deploy/compose.prod.yml`](../../deploy/compose.prod.yml) | caddy, web (TODO until crm-web's Dockerfile exists), api, migrate, postgres, redis; memory limits; nothing but Caddy exposed |
-| [`deploy/Caddyfile`](../../deploy/Caddyfile) | HTTPS, routing `/api/*` and `/socket.io/*` → api, everything else → web, security headers |
+| [`deploy/compose.prod.yml`](../../deploy/compose.prod.yml) | caddy, web (crm-web's nginx image), api, migrate, postgres, redis; memory limits; nothing but Caddy exposed |
+| [`deploy/Caddyfile`](../../deploy/Caddyfile) | HTTPS + HSTS, everything → web nginx (which routes `/api/*` and `/socket.io/*` to the api) |
 | [`deploy/cloud-init.yml`](../../deploy/cloud-init.yml) | EC2 user data: updates, 2 GB swap, Docker from its apt repository, log rotation, AWS CLI v2, backup cron |
 | [`deploy/.env.prod.example`](../../deploy/.env.prod.example) | every setting the server needs, with placeholder values only |
 | [`deploy/backup.sh`](../../deploy/backup.sh) / [`deploy/restore.sh`](../../deploy/restore.sh) | daily `pg_dump` → check → S3; interactive restore |
@@ -104,8 +104,9 @@ Already validated locally:
 - `caddy validate` and `caddy fmt` pass on the Caddyfile.
 - The cloud-init YAML and IAM JSON files parse, and `bash -n` passes on both scripts.
 - The `runtime` and `migrate` images were built and run against Postgres and Redis in M5.
+- The same web nginx → api routing was run locally with `docker compose --profile app` (2026-11-24) and worked through http://localhost:8080: the SPA, health check, login with the `crm_rt` cookie, refresh with the cookie, data with masked PII, a Socket.IO WebSocket with a token (a bad token was refused), and Swagger.
 
-**Not run yet:** the whole production stack together behind Caddy, and anything on AWS.
+**Not run yet:** Caddy in front of that stack with a real certificate, and anything on AWS.
 
 ## 6. Setup checklist (manual, in the AWS console)
 

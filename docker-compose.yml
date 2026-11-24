@@ -2,7 +2,8 @@
 # Host ports are shifted (5433, 6380) so this stack can run next to other projects.
 #   docker compose up -d postgres redis          # infrastructure for local dev
 #   JWT_ACCESS_SECRET=... docker compose --profile app up -d --build
-#                                                # + migrations and the API in Docker
+#                                                # + migrations, the API and the web app
+#   → open http://localhost:8080 (web; nginx also proxies /api and /socket.io to the API)
 name: affiliate-crm
 
 services:
@@ -65,14 +66,38 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       # Set to true behind HTTPS (adds Secure to the refresh-token cookie).
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # The browser reaches the API through the web container's nginx: one
+      # proxy hop, so rate limits use the client IP from X-Forwarded-For.
+      TRUST_PROXY: '1'
       PARTNER_WEBHOOKS: ${PARTNER_WEBHOOKS:-[]}
     ports:
+      # Loopback only: with TRUST_PROXY=1 a client reaching the API directly
+      # could fake X-Forwarded-For, so the public entry point is nginx (8080).
       # Change API_PORT if `npm run start:dev` already uses 3000.
-      - '${API_PORT:-3000}:3000'
+      - '127.0.0.1:${API_PORT:-3000}:3000'
     depends_on:
       migrate:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+
+  # React build served by nginx; nginx also proxies /api and /socket.io to the
+  # API, so the browser sees one origin (no CORS; the SameSite=Strict refresh
+  # cookie just works). Image: apps/web/Dockerfile (crm-web).
+  web:
+    profiles: ['app']
+    build:
+      context: ./apps/web
+      # Defaults: VITE_API_URL=/api/v1, VITE_SOCKET_URL= (same origin).
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://api:3000
+      NGINX_RESOLVER: 127.0.0.11
+      CSP_CONNECT_SRC: ''
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      api:
         condition: service_healthy
 
 volumes:

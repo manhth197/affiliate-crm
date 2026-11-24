@@ -1,33 +1,20 @@
-# Caddy: automatic HTTPS (Let's Encrypt) for DOMAIN and one-origin routing.
+# Caddy: automatic HTTPS (Let's Encrypt) for DOMAIN, then everything goes to
+# the web container's nginx, which serves the React build and proxies /api and
+# /socket.io to the API (the same routing as the local docker-compose stack).
 # DOMAIN and ACME_EMAIL come from deploy/.env.prod via compose.prod.yml.
 {
 	email {$ACME_EMAIL}
 }
 
 {$DOMAIN} {
-	encode zstd gzip
+	# Caddy replaces any X-Forwarded-For sent by the client with the real client
+	# IP; nginx then appends Caddy's address. Hence TRUST_PROXY=2 on the API.
+	reverse_proxy web:80
 
-	# REST API and Swagger UI (/api/v1/..., /api/docs) → NestJS.
-	handle /api/* {
-		reverse_proxy api:3000
-	}
-
-	# Socket.IO (long-polling and WebSocket upgrade) → NestJS.
-	handle /socket.io/* {
-		reverse_proxy api:3000
-	}
-
-	# Everything else → the React app.
-	# TODO(web): needs the `web` service (crm-web Docker image) in compose.prod.yml.
-	handle {
-		reverse_proxy web:80
-	}
-
+	# CSP and the other security headers come from the web image's nginx;
+	# Caddy only adds what depends on HTTPS.
 	header {
 		Strict-Transport-Security "max-age=31536000"
-		X-Content-Type-Options "nosniff"
-		X-Frame-Options "DENY"
-		Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
 
