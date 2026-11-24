@@ -23,7 +23,15 @@ export function verifyAccessToken(token: string, now = Date.now()): string | nul
   return userId
 }
 
-export function issueTokens(userId: string, now = Date.now()): TokenPair {
+/** What the server keeps: the public token pair plus the refresh token that goes in the cookie. */
+export type IssuedTokens = TokenPair & { refreshToken: string }
+
+/** The JSON body the API returns (contract v0.7: no refresh token in it). */
+export function publicTokens({ accessToken, expiresIn }: IssuedTokens): TokenPair {
+  return { accessToken, expiresIn }
+}
+
+export function issueTokens(userId: string, now = Date.now()): IssuedTokens {
   const refreshToken = `mock-refresh.${crypto.randomUUID()}`
   db.sessions[refreshToken] = { userId, expiresAt: now + REFRESH_TOKEN_TTL_MS }
   return {
@@ -37,7 +45,7 @@ export function issueTokens(userId: string, now = Date.now()): TokenPair {
  * Single use: the old refresh token is deleted and a new pair is returned.
  * Null if the token is unknown, expired, or its user was disabled.
  */
-export function rotateRefreshToken(refreshToken: string, now = Date.now()): TokenPair | null {
+export function rotateRefreshToken(refreshToken: string, now = Date.now()): IssuedTokens | null {
   const session = db.sessions[refreshToken]
   if (!session) return null
   delete db.sessions[refreshToken]
@@ -82,7 +90,7 @@ export function clearRefreshCookie(): HeadersInit {
 }
 
 /** Tests: a logged-in browser for this user (session + cookie), skipping the login form. */
-export function startMockSession(userId: string): TokenPair {
+export function startMockSession(userId: string): IssuedTokens {
   const tokens = issueTokens(userId)
   db.refreshCookie = tokens.refreshToken
   return tokens

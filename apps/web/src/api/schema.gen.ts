@@ -48,8 +48,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Exchange a refresh token for a new token pair
-         * @description Refresh tokens are single use. Reusing an old one revokes the whole session (401).
+         * New access token from the crm_rt cookie
+         * @description Reads the refresh token from the httpOnly `crm_rt` cookie (the only transport since contract v0.7) and rotates it. Send `Content-Type: application/json` with an empty body `{}`; any body property → 400. Refresh tokens are single use: reusing an old one revokes the whole session (401). On 401/403 the cookie is cleared.
          */
         post: operations["Auth_refresh"];
         delete?: never;
@@ -67,7 +67,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke a refresh token (end this session) */
+        /**
+         * End this session
+         * @description Revokes the refresh token in the `crm_rt` cookie and always clears the cookie. Empty body `{}`.
+         */
         post: operations["Auth_logout"];
         delete?: never;
         options?: never;
@@ -426,7 +429,7 @@ export interface paths {
         put?: never;
         /**
          * Generate DRAFT payouts for a month (background job)
-         * @description Groups APPROVED commissions created in the month (Vietnam calendar) per affiliate. Safe to run again: DRAFT payouts are topped up, CONFIRMED/PAID ones are left alone.
+         * @description Per affiliate, puts every APPROVED commission not yet in a payout and created before the end of the month (Vietnam calendar) into the DRAFT payout of that month, so late approvals roll into the next payout. Safe to run again: DRAFT payouts are recalculated, CONFIRMED/PAID ones are never changed.
          */
         post: operations["Payouts_generate"];
         delete?: never;
@@ -673,8 +676,6 @@ export interface components {
             user: components["schemas"]["Me"];
             /** @description JWT, valid for 15 minutes. Send as `Authorization: Bearer <accessToken>`. */
             accessToken: string;
-            /** @description Opaque token, valid for 7 days, single use: every refresh returns a new one. */
-            refreshToken: string;
             /**
              * @description Seconds until the access token expires.
              * @example 900
@@ -690,15 +691,10 @@ export interface components {
             /** @example Demo@12345 */
             password: string;
         };
-        RefreshTokenRequest: {
-            /** @description The refresh token returned by login, register or the previous refresh. */
-            refreshToken: string;
-        };
+        EmptyRequest: Record<string, never>;
         TokenPair: {
             /** @description JWT, valid for 15 minutes. Send as `Authorization: Bearer <accessToken>`. */
             accessToken: string;
-            /** @description Opaque token, valid for 7 days, single use: every refresh returns a new one. */
-            refreshToken: string;
             /**
              * @description Seconds until the access token expires.
              * @example 900
@@ -1033,7 +1029,7 @@ export interface components {
         };
         GeneratePayoutsRequest: {
             /**
-             * @description Month whose APPROVED commissions are paid out (Vietnam calendar).
+             * @description Payout period (Vietnam calendar); includes APPROVED commissions created up to its end.
              * @example 2026-11
              */
             month: string;
@@ -1052,7 +1048,7 @@ export interface components {
         };
         ReportOverview: {
             /** @description Number of leads created in [from, to), by current status */
-            leadsByStatus?: {
+            leadsByStatus: {
                 NEW: number;
                 CONTACTED: number;
                 SUBMITTED: number;
@@ -1061,7 +1057,7 @@ export interface components {
                 REJECTED: number;
             };
             /** @description Commission amounts in VND (sum) for commissions created in [from, to), by status */
-            commissionByStatus?: {
+            commissionByStatus: {
                 PENDING: number;
                 APPROVED: number;
                 PAID: number;
@@ -1165,6 +1161,8 @@ export interface operations {
         responses: {
             201: {
                 headers: {
+                    /** @description crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production) */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1214,6 +1212,8 @@ export interface operations {
         responses: {
             200: {
                 headers: {
+                    /** @description crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production) */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1266,19 +1266,21 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RefreshTokenRequest"];
+                "application/json": components["schemas"]["EmptyRequest"];
             };
         };
         responses: {
             200: {
                 headers: {
+                    /** @description crm_rt=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production) */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["TokenPair"];
                 };
             };
-            /** @description Invalid, expired or reused refresh token */
+            /** @description Missing, invalid, expired or reused refresh token */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -1289,6 +1291,15 @@ export interface operations {
             };
             /** @description Account is disabled */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Cookie call without Content-Type: application/json */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1316,7 +1327,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RefreshTokenRequest"];
+                "application/json": components["schemas"]["EmptyRequest"];
             };
         };
         responses: {

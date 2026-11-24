@@ -525,3 +525,30 @@ describe('mock API: refresh cookie (contract v0.6)', () => {
     expect(db.refreshCookie).toBeNull()
   })
 })
+
+describe('mock API: contract v0.7 (no refresh token in bodies)', () => {
+  it('returns only the access token and its lifetime from login', async () => {
+    const response = await fetch('http://localhost:3000/api/v1/auth/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ctv1@demo.vn', password: 'Demo@12345' }),
+    })
+    const body = (await response.json()) as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(['accessToken', 'expiresIn', 'user'])
+    expect(response.headers.get('set-cookie')).toMatch(/^crm_rt=/)
+  })
+
+  it('refuses a refresh token sent in the body', async () => {
+    const user = findUserByEmail('ctv1@demo.vn')!
+    const { refreshToken } = startMockSession(user.id)
+    const response = await fetch('http://localhost:3000/api/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+    expect(response.status).toBe(400)
+    expect(db.sessions[refreshToken]).toBeDefined() // not consumed
+  })
+})

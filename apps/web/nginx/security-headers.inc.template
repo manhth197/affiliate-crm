@@ -1,0 +1,11 @@
+# Included in every location that sets its own headers (nginx's add_header is not inherited
+# by a location that has add_header of its own).
+#
+# CSP: scripts only from this origin (the Vite build has no inline scripts). Inline *styles*
+# are allowed because Radix UI, Recharts and sonner position elements with style attributes.
+# connect-src 'self' covers the API and the Socket.IO WebSocket behind this nginx.
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ${CSP_CONNECT_SRC}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;

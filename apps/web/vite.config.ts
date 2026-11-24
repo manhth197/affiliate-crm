@@ -1,9 +1,9 @@
-/// <reference types="vitest/config" />
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { msw } from 'msw/vite'
 import { defineConfig, loadEnv } from 'vite'
+import { configDefaults } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -26,6 +26,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
+      // Playwright specs (e2e/) need a running stack; `npm run e2e` runs them.
+      exclude: [...configDefaults.exclude, 'e2e/**'],
       restoreMocks: true,
     },
   }
