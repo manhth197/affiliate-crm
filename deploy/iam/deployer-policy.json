@@ -1,0 +1,91 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Ec2InSingaporeOnly",
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "ap-southeast-1" } }
+    },
+    {
+      "Sid": "OnlySmallInstanceTypes",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "StringNotEquals": { "ec2:InstanceType": ["t4g.small", "t4g.micro"] }
+      }
+    },
+    {
+      "Sid": "NoLongTermPurchases",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:PurchaseReservedInstancesOffering",
+        "ec2:PurchaseHostReservation",
+        "ec2:PurchaseScheduledInstances",
+        "ec2:AllocateHosts"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassOnlyTheAppInstanceRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::REPLACE_ACCOUNT_ID:role/affiliate-crm-ec2",
+      "Condition": { "StringEquals": { "iam:PassedToService": "ec2.amazonaws.com" } }
+    },
+    {
+      "Sid": "SeeRolesInTheLaunchWizard",
+      "Effect": "Allow",
+      "Action": ["iam:ListRoles", "iam:ListInstanceProfiles", "iam:GetRole", "iam:GetInstanceProfile"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BackupBucketOnly",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::REPLACE_BACKUP_BUCKET",
+        "arn:aws:s3:::REPLACE_BACKUP_BUCKET/*"
+      ]
+    },
+    {
+      "Sid": "ListBucketsInConsole",
+      "Effect": "Allow",
+      "Action": "s3:ListAllMyBuckets",
+      "Resource": "*"
+    },
+    {
+      "Sid": "WatchCosts",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget",
+        "ce:GetCostAndUsage",
+        "ce:GetCostForecast",
+        "freetier:GetFreeTierUsage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SessionManagerShell",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:StartSession",
+        "ssm:TerminateSession",
+        "ssm:ResumeSession",
+        "ssm:DescribeSessions",
+        "ssm:GetConnectionStatus",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

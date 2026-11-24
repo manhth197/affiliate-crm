@@ -1,0 +1,134 @@
+# Production stack for ONE small server (EC2 t4g.small, see docs/deploy/aws.md).
+# Everything is served from one domain by Caddy (automatic HTTPS):
+#   https://DOMAIN/            → web (React, nginx)        [TODO: needs the crm-web image]
+#   https://DOMAIN/api/...     → api (NestJS, REST + Swagger at /api/docs)
+#   https://DOMAIN/socket.io/  → api (Socket.IO)
+# One origin means the refresh-token cookie (Secure; SameSite=Strict) just works
+# and CORS is not even needed for the browser app.
+#
+# On the server, from the repo checkout:
+#   cd deploy
+#   cp .env.prod.example .env.prod && nano .env.prod     # fill in real values
+#   docker compose -f compose.prod.yml --env-file .env.prod up -d --build
+#   docker compose -f compose.prod.yml --env-file .env.prod run --rm migrate npx prisma db seed   # demo data, optional
+name: affiliate-crm-prod
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  caddy:
+    <<: *restart
+    image: caddy:2-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env.prod}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.prod}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates: keep this volume
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 128m
+
+  # TODO(web): enable when apps/web has its Dockerfile (crm-web M5): remove
+  # `profiles` so it starts with the rest. It must be built for this origin:
+  # VITE_API_URL=https://${DOMAIN}/api/v1 and VITE_SOCKET_URL=https://${DOMAIN}
+  # (build args or whatever the web Dockerfile expects). Until then Caddy
+  # answers 502 on "/", while /api and /socket.io work.
+  web:
+    <<: *restart
+    profiles: ['web']
+    build:
+      context: ../apps/web
+      args:
+        VITE_API_URL: https://${DOMAIN}/api/v1
+        VITE_SOCKET_URL: https://${DOMAIN}
+    mem_limit: 64m
+
+  api:
+    <<: *restart
+    build:
+      context: ../apps/api
+      target: runtime
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=384
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?}
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET (48+ random chars)}
+      CORS_ORIGINS: https://${DOMAIN}
+      # HTTPS only: the refresh-token cookie gets the Secure flag.
+      COOKIE_SECURE: 'true'
+      # One proxy (Caddy) in front: rate limits use the real client IP.
+      TRUST_PROXY: '1'
+      PARTNER_WEBHOOKS: ${PARTNER_WEBHOOKS:-[]}
+      COMMISSION_RECONCILE_MINUTES: '10'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+
+  # Runs `prisma migrate deploy` once per `up`, then exits.
+  migrate:
+    build:
+      context: ../apps/api
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    <<: *restart
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 512m
+    # Not published on the host: only reachable inside the compose network.
+
+  redis:
+    <<: *restart
+    image: redis:7-alpine
+    # AOF so queued jobs survive a restart; BullMQ needs `noeviction`.
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '128mb',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 192m
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:
