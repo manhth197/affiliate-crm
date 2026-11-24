@@ -139,6 +139,8 @@ export function LeadKanban({ baseQuery }: { baseQuery: LeadQuery }) {
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}
+      // Scroll the board only when the card is close to its edge (default zone is 20%).
+      autoScroll={{ threshold: { x: 0.1, y: 0.1 } }}
       accessibility={{ announcements, screenReaderInstructions }}
       onDragStart={onDragStart}
       onDragCancel={() => setDragging(null)}

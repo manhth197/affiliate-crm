@@ -317,6 +317,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/commissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List commissions
+         * @description Affiliates only see their own (affiliateId is ignored).
+         */
+        get: operations["Commissions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/commissions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Commission totals for the logged-in affiliate */
+        get: operations["Commissions_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/commissions/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Approve a PENDING commission (admin) */
+        patch: operations["Commissions_approve"];
+        trace?: never;
+    };
+    "/api/v1/commissions/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Cancel a commission (admin)
+         * @description Allowed for PENDING or APPROVED commissions not yet in a payout.
+         */
+        patch: operations["Commissions_cancel"];
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My notifications, newest first */
+        get: operations["Notifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark all my notifications as read */
+        patch: operations["Notifications_markAllRead"];
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark one notification as read (owner) */
+        patch: operations["Notifications_markRead"];
+        trace?: never;
+    };
+    "/api/v1/webhooks/partner-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lead status update pushed by a partner (signed)
+         * @description X-Signature = hex HMAC-SHA256 of `${X-Timestamp}.${rawBody}` with the partner secret. Timestamps older than 5 minutes are rejected. A repeated eventId returns {ok: true, duplicate: true}.
+         */
+        post: operations["Webhooks_partnerStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -338,6 +483,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Machine-readable code on business errors (403 disabled account, 409, 422).
+         * @enum {string}
+         */
+        ErrorCode: "ACCOUNT_DISABLED" | "EMAIL_TAKEN" | "DUPLICATE_LEAD" | "INVALID_TRANSITION" | "CONCURRENT_UPDATE" | "PRODUCT_UNAVAILABLE" | "AMOUNT_NOT_ALLOWED" | "ASSIGNEE_NOT_STAFF" | "CANNOT_DISABLE_SELF" | "DISBURSED_AMOUNT_REQUIRED" | "INVALID_COMMISSION_STATUS";
         ErrorDetail: {
             /** @description Dotted path of the invalid field, e.g. "customerPhone". */
             field: string;
@@ -346,6 +496,8 @@ export interface components {
         ErrorResponse: {
             /** @example 400 */
             statusCode: number;
+            /** @description Machine-readable code on business errors (403 disabled account, 409, 422). */
+            code?: components["schemas"]["ErrorCode"];
             /** @example Bad Request */
             error: string;
             /** @example Validation failed */
@@ -354,8 +506,8 @@ export interface components {
         };
         RegisterRequest: {
             /**
-             * @description VN mobile number. "+84", spaces and dots are accepted and normalised to 0XXXXXXXXX.
-             * @example 0912345678
+             * @description Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).
+             * @example +84 912 345 678
              */
             phone: string;
             /**
@@ -465,7 +617,10 @@ export interface components {
             meta: components["schemas"]["PageMeta"];
         };
         CreateUserRequest: {
-            /** @example 0987654321 */
+            /**
+             * @description Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).
+             * @example +84 912 345 678
+             */
             phone: string;
             /** @enum {string} */
             role: "STAFF" | "ADMIN";
@@ -482,7 +637,10 @@ export interface components {
         UpdateUserRequest: {
             /** @description Disabling a user also ends all of their sessions. */
             status?: components["schemas"]["UserStatus"];
-            /** @example 0987654321 */
+            /**
+             * @description Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).
+             * @example +84 912 345 678
+             */
             phone?: string;
             fullName?: string;
         };
@@ -610,7 +768,10 @@ export interface components {
         CreateLeadRequest: {
             /** Format: uuid */
             productId: string;
-            /** @example 0987654321 */
+            /**
+             * @description Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).
+             * @example +84 912 345 678
+             */
             customerPhone: string;
             /** @example Hoàng Thị Mai */
             customerName: string;
@@ -659,10 +820,100 @@ export interface components {
             toStatus: components["schemas"]["LeadStatus"] | null;
             /** @description Null when the change came from a partner webhook. */
             actor: components["schemas"]["UserRef"] | null;
+            /** @description Set on ASSIGNED entries: who the lead was assigned to. */
+            assignee: components["schemas"]["UserRef"] | null;
             /** Format: date-time */
             createdAt: string;
-            /** @description For ASSIGNED entries: the assignee's full name. */
             note: string | null;
+        };
+        /** @enum {string} */
+        CommissionStatus: "PENDING" | "APPROVED" | "PAID" | "CANCELLED";
+        CommissionLead: {
+            /** Format: uuid */
+            id: string;
+            /** @example LD-000123 */
+            code: string;
+            /** @example Hoàng Thị Mai */
+            customerName: string;
+        };
+        Commission: {
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["CommissionStatus"];
+            /** Format: uuid */
+            payoutId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            lead: components["schemas"]["CommissionLead"];
+            affiliate: components["schemas"]["UserRef"];
+            /**
+             * @description VND
+             * @example 750000
+             */
+            amount: number;
+        };
+        PaginatedCommissions: {
+            data: components["schemas"]["Commission"][];
+            meta: components["schemas"]["PageMeta"];
+        };
+        CommissionSummary: {
+            /** @example 750000 */
+            pending: number;
+            approved: number;
+            paid: number;
+            totalLeads: number;
+            disbursedLeads: number;
+        };
+        CancelCommissionRequest: {
+            /** @example Khách hàng huỷ hợp đồng trong 15 ngày */
+            reason: string;
+        };
+        /** @enum {string} */
+        NotificationType: "LEAD_STATUS_CHANGED" | "COMMISSION_CREATED" | "PAYOUT_PAID" | "LEAD_ASSIGNED";
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["NotificationType"];
+            /**
+             * @description Flat string map, e.g. { "leadId": "…", "status": "APPROVED" }.
+             * @example {
+             *       "leadId": "0190…",
+             *       "leadCode": "LD-000123",
+             *       "status": "APPROVED"
+             *     }
+             */
+            data: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @example Lead LD-000123: Đã duyệt */
+            title: string;
+            body: string;
+        };
+        PaginatedNotifications: {
+            data: components["schemas"]["Notification"][];
+            meta: components["schemas"]["PageMeta"];
+            /** @description Unread notifications of the user (all pages). */
+            unreadCount: number;
+        };
+        PartnerStatusWebhookRequest: {
+            /** @enum {string} */
+            status: "APPROVED" | "REJECTED" | "DISBURSED";
+            /** @description Partner's unique id for this event; repeats are acknowledged, not re-applied. */
+            eventId: string;
+            /** @example LD-000123 */
+            leadCode: string;
+            /** @description VND; required when status is DISBURSED. */
+            disbursedAmount?: number;
+            note?: string;
+        };
+        WebhookAck: {
+            ok: boolean;
+            /** @description true when this eventId was already processed (nothing changed). */
+            duplicate?: boolean;
         };
         Health: {
             /** @enum {string} */
@@ -1289,13 +1540,14 @@ export interface operations {
         parameters: {
             query: {
                 status?: components["schemas"]["LeadStatus"];
+                /** @description A staff user id, or `none` for leads nobody has been assigned. */
+                assignedStaffId?: string;
                 /** @description field:direction, field one of createdAt, updatedAt, requestedAmount, disbursedAmount */
                 sort?: string;
                 productId?: string;
                 /** @description Ignored for affiliates (they only see their own leads). */
                 affiliateId?: string;
-                assignedStaffId?: string;
-                /** @description Customer name, lead code (LD-000123) or phone digits. */
+                /** @description Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits. */
                 q?: string;
                 /** @description createdAt ≥ from. ISO datetime with timezone, e.g. 2026-11-01T00:00:00+07:00 */
                 from?: string;
@@ -1412,13 +1664,14 @@ export interface operations {
         parameters: {
             query: {
                 status?: components["schemas"]["LeadStatus"];
+                /** @description A staff user id, or `none` for leads nobody has been assigned. */
+                assignedStaffId?: string;
                 /** @description field:direction, field one of createdAt, updatedAt, requestedAmount, disbursedAmount */
                 sort?: string;
                 productId?: string;
                 /** @description Ignored for affiliates (they only see their own leads). */
                 affiliateId?: string;
-                assignedStaffId?: string;
-                /** @description Customer name, lead code (LD-000123) or phone digits. */
+                /** @description Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits. */
                 q?: string;
                 /** @description createdAt ≥ from. ISO datetime with timezone, e.g. 2026-11-01T00:00:00+07:00 */
                 from?: string;
@@ -1778,6 +2031,427 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Commissions_list: {
+        parameters: {
+            query: {
+                status?: components["schemas"]["CommissionStatus"];
+                /** @description Ignored for affiliates (they only see their own commissions). */
+                affiliateId?: string;
+                /** @description Month the commission was created, Vietnam calendar. */
+                month?: string;
+                /** @description 1-based page number. */
+                page: number;
+                /** @description Items per page (max 100). */
+                pageSize: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCommissions"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Commissions_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommissionSummary"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Commissions_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Commission"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Commissions_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelCommissionRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Commission"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_list: {
+        parameters: {
+            query: {
+                /** @description true: only unread notifications. */
+                unread?: boolean;
+                /** @description 1-based page number. */
+                page: number;
+                /** @description Items per page (max 100). */
+                pageSize: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedNotifications"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Webhooks_partnerStatus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Hex HMAC-SHA256 */
+                "X-Signature": string;
+                /** @description Unix time in seconds */
+                "X-Timestamp": string;
+                "X-Partner-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerStatusWebhookRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

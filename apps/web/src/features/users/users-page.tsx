@@ -264,8 +264,7 @@ function LockUserDialog({ user, onClose }: { user: User | null; onClose: () => v
           toast.success(`Đã khóa ${user.fullName}`)
           onClose()
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, { 422: 'Không thể khóa tài khoản này.' })),
+        onError: (error) => toast.error(getErrorMessage(error)),
       },
     )
   }

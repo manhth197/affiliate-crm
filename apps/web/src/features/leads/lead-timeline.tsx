@@ -34,15 +34,14 @@ function describe(activity: LeadActivity, partnerName: string): Described {
       return { title: `Chuyển trạng thái: ${transition}`, actor, note }
     case 'WEBHOOK':
       return { title: `Đối tác cập nhật: ${transition}`, actor: `Đối tác ${partnerName}`, note }
-    case 'ASSIGNED': {
-      // Contract v0.3 has `assignee`; the current API export puts the assignee's name in `note`.
-      const assignee = activity.assignee?.fullName ?? note
+    case 'ASSIGNED':
       return {
-        title: assignee ? `Phân công cho ${assignee}` : 'Phân công nhân viên phụ trách',
+        title: activity.assignee
+          ? `Phân công cho ${activity.assignee.fullName}`
+          : 'Phân công nhân viên phụ trách',
         actor,
-        note: activity.assignee ? note : null,
+        note,
       }
-    }
     case 'NOTE':
       return { title: 'Ghi chú nội bộ', actor, note }
   }

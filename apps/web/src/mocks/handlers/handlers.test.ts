@@ -387,6 +387,6 @@ describe('mock API: pipeline actions (M3)', () => {
     const error = await fail(
       apiRequest(`/users/${admin.id}`, { method: 'PATCH', body: { status: 'DISABLED' } }),
     )
-    expect(error.status).toBe(422)
+    expect(error).toMatchObject({ status: 422, code: 'CANNOT_DISABLE_SELF' })
   })
 })

@@ -210,7 +210,7 @@ export const adminHandlers = [
     }
     if (details.length) return apiError(400, 'Validation failed', details)
     if (body.status === 'DISABLED' && user.id === auth.user.id) {
-      return apiError(422, 'Admins cannot disable themselves')
+      return businessError(422, 'CANNOT_DISABLE_SELF', 'Admins cannot disable themselves')
     }
 
     if (body.status) user.status = body.status

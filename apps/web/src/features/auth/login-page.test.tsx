@@ -76,4 +76,22 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('heading', { name: 'Đăng nhập' })).toBeVisible()
     expect(Object.keys(db.sessions)).toHaveLength(0)
   })
+
+  it('sends the next user to their own home page after an explicit logout', async () => {
+    const lead = db.leads[0]!
+    const { user, router } = renderApp(`/leads/${lead.id}`, { as: 'staff@demo.vn' })
+
+    await user.click(await screen.findByRole('button', { name: 'Tài khoản' }))
+    await user.click(
+      within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Đăng xuất' }),
+    )
+    await screen.findByRole('heading', { name: 'Đăng nhập' })
+
+    await user.type(screen.getByLabelText('Email'), 'admin@demo.vn')
+    await user.type(screen.getByLabelText('Mật khẩu'), 'Demo@12345')
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }))
+
+    expect(await screen.findByRole('heading', { name: /Xin chào/ })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/')
+  })
 })

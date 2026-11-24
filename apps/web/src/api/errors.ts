@@ -3,8 +3,8 @@ import type { ApiErrorBody, ApiErrorCode } from './types'
 /** Error thrown by the API client for any non-2xx response (status 0 = network failure). */
 export class ApiError extends Error {
   readonly status: number
-  /** Machine-readable business error code (contract v0.3), e.g. "DUPLICATE_LEAD". */
-  readonly code: string | undefined
+  /** Machine-readable business error code, e.g. "DUPLICATE_LEAD". */
+  readonly code: ApiErrorCode | undefined
   readonly details: { field: string; message: string }[]
 
   constructor(status: number, body?: Partial<ApiErrorBody>) {
@@ -31,6 +31,10 @@ const MESSAGES_BY_CODE: Record<ApiErrorCode, string> = {
   PRODUCT_UNAVAILABLE: 'Sản phẩm này hiện không nhận hồ sơ. Vui lòng chọn sản phẩm khác.',
   AMOUNT_NOT_ALLOWED: 'Sản phẩm này không cần nhập số tiền vay.',
   ASSIGNEE_NOT_STAFF: 'Chỉ có thể giao lead cho nhân viên hoặc quản trị viên đang hoạt động.',
+  CANNOT_DISABLE_SELF: 'Bạn không thể tự khóa tài khoản của mình.',
+  DISBURSED_AMOUNT_REQUIRED: 'Cần có số tiền giải ngân để chuyển sang “Đã giải ngân”.',
+  INVALID_COMMISSION_STATUS:
+    'Hoa hồng này không còn ở trạng thái cho phép thao tác. Vui lòng tải lại.',
 }
 
 const MESSAGES_BY_STATUS: Record<number, string> = {
@@ -54,7 +58,7 @@ export function hasErrorCode(error: unknown, code: ApiErrorCode): error is ApiEr
  */
 export function getErrorMessage(error: unknown, overrides: Partial<Record<number, string>> = {}) {
   if (!isApiError(error)) return 'Đã có lỗi xảy ra. Vui lòng thử lại.'
-  const byCode = error.code ? MESSAGES_BY_CODE[error.code as ApiErrorCode] : undefined
+  const byCode = error.code ? MESSAGES_BY_CODE[error.code] : undefined
   return (
     byCode ??
     overrides[error.status] ??
