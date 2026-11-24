@@ -3,7 +3,7 @@ import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/app.setup';
+import { APP_OPTIONS, configureApp } from '../src/app.setup';
 import { PasswordService } from '../src/users/password.service';
 import {
   CommissionType,
@@ -29,7 +29,8 @@ export async function createTestApp(
   const moduleRef = await customize(
     Test.createTestingModule({ imports: [AppModule] }),
   ).compile();
-  const app = moduleRef.createNestApplication<INestApplication<App>>();
+  const app =
+    moduleRef.createNestApplication<INestApplication<App>>(APP_OPTIONS);
   configureApp(app);
   await app.init();
   return {
@@ -155,4 +156,70 @@ export async function login(
     accessToken: res.body.accessToken,
     refreshToken: res.body.refreshToken,
   };
+}
+
+/** Polls until `check` returns a truthy value (background jobs are asynchronous). */
+export async function waitFor<T>(
+  check: () =>
+    T | null | undefined | false | Promise<T | null | undefined | false>,
+  { timeoutMs = 5000, intervalMs = 50 } = {},
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const value = await check();
+    if (value) {
+      return value;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`waitFor timed out after ${timeoutMs} ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
+let leadPhoneCounter = 0;
+/** A distinct customer phone, so the duplicate-lead rule never interferes. */
+export function nextCustomerPhone(): string {
+  leadPhoneCounter += 1;
+  return `03${String(10_000_000 + leadPhoneCounter + process.pid).slice(-8)}`;
+}
+
+/** Affiliate submits a lead through the API. */
+export async function submitLead(
+  ctx: TestContext,
+  affiliate: Actor,
+  productId: string,
+  overrides: Record<string, unknown> = {},
+): Promise<{ id: string; code: string }> {
+  const res = await ctx
+    .http()
+    .post(`${API}/leads`)
+    .set(...bearer(affiliate))
+    .send({
+      productId,
+      customerName: 'Khách Hàng Test',
+      customerPhone: nextCustomerPhone(),
+      ...overrides,
+    })
+    .expect(201);
+  return { id: res.body.id, code: res.body.code };
+}
+
+/** Staff moves a lead step by step up to (and including) `target`. */
+export async function advanceLead(
+  ctx: TestContext,
+  staff: Actor,
+  leadId: string,
+  target: 'CONTACTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED',
+  disbursedAmount = 50_000_000,
+): Promise<void> {
+  const steps = ['CONTACTED', 'SUBMITTED', 'APPROVED', 'DISBURSED'];
+  for (const status of steps.slice(0, steps.indexOf(target) + 1)) {
+    await ctx
+      .http()
+      .patch(`${API}/leads/${leadId}/status`)
+      .set(...bearer(staff))
+      .send(status === 'DISBURSED' ? { status, disbursedAmount } : { status })
+      .expect(200);
+  }
 }

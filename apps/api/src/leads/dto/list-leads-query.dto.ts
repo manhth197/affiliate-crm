@@ -15,7 +15,14 @@ import {
   DEFAULT_LEAD_SORT,
   LEAD_SORT_FIELDS,
   LEAD_SORT_PATTERN,
+  UNASSIGNED,
 } from '../lead-filters';
+
+/** A UUID, or the literal "none" (unassigned). */
+const UUID_OR_NONE_PATTERN = new RegExp(
+  `^(${UNASSIGNED}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`,
+  'i',
+);
 
 export class LeadFiltersDto {
   @ApiProperty({ enum: LeadStatus, enumName: 'LeadStatus', required: false })
@@ -32,11 +39,13 @@ export class LeadFiltersDto {
   @IsUUID()
   affiliateId?: string;
 
+  /** A staff user id, or `none` for leads nobody has been assigned. */
+  @ApiProperty({ required: false, pattern: UUID_OR_NONE_PATTERN.source })
   @IsOptional()
-  @IsUUID()
+  @Matches(UUID_OR_NONE_PATTERN, { message: 'must be a UUID or "none"' })
   assignedStaffId?: string;
 
-  /** Customer name, lead code (LD-000123) or phone digits. */
+  /** Customer name (case- and accent-insensitive), lead code (LD-000123) or 3+ phone digits. */
   @IsOptional()
   @Trim()
   @IsString()

@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { type Paginated, pageArgs, toPage } from '../common/dto/pagination.dto';
 import { isUniqueViolation } from '../common/prisma-errors';
@@ -17,6 +12,11 @@ import type { StaffMemberDto, UserDto } from './dto/user.dto';
 import { PasswordService } from './password.service';
 import { generateReferralCode } from './referral-code';
 import { toUserDto, type UserWithProfile } from './user.mapper';
+import {
+  conflict,
+  ErrorCode,
+  unprocessable,
+} from '../common/errors/error-codes';
 
 const REFERRAL_CODE_ATTEMPTS = 5;
 
@@ -70,7 +70,7 @@ export class UsersService {
         });
       } catch (error) {
         if (isUniqueViolation(error, 'email')) {
-          throw new ConflictException('Email is already registered');
+          throw conflict(ErrorCode.EMAIL_TAKEN, 'Email is already registered');
         }
         if (
           isUniqueViolation(error, 'referral_code') &&
@@ -125,7 +125,7 @@ export class UsersService {
 
   async createStaff(dto: CreateUserDto, actorId: string): Promise<UserDto> {
     if (await this.findByEmail(dto.email)) {
-      throw new ConflictException('Email is already registered');
+      throw conflict(ErrorCode.EMAIL_TAKEN, 'Email is already registered');
     }
     const passwordHash = await this.passwords.hash(dto.password);
     try {
@@ -154,7 +154,7 @@ export class UsersService {
       return toUserDto(user);
     } catch (error) {
       if (isUniqueViolation(error, 'email')) {
-        throw new ConflictException('Email is already registered');
+        throw conflict(ErrorCode.EMAIL_TAKEN, 'Email is already registered');
       }
       throw error;
     }
@@ -170,7 +170,8 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     if (id === actorId && dto.status === UserStatus.DISABLED) {
-      throw new UnprocessableEntityException(
+      throw unprocessable(
+        ErrorCode.CANNOT_DISABLE_SELF,
         'You cannot disable your own account',
       );
     }

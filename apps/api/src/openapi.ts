@@ -11,7 +11,7 @@ import { NestFactory } from '@nestjs/core';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { AppModule } from './app.module';
-import { configureApp, createOpenApiDocument } from './app.setup';
+import { APP_OPTIONS, configureApp, createOpenApiDocument } from './app.setup';
 
 const DEFAULT_OUTPUT = resolve(
   __dirname,
@@ -24,6 +24,7 @@ const DEFAULT_OUTPUT = resolve(
 
 async function exportOpenApi(outputFile: string): Promise<void> {
   const app = await NestFactory.create(AppModule, {
+    ...APP_OPTIONS,
     logger: ['error', 'warn'],
   });
   configureApp(app);

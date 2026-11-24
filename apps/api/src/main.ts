@@ -5,6 +5,7 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import {
   API_PREFIX,
+  APP_OPTIONS,
   configureApp,
   createOpenApiDocument,
   DOCS_PATH,
@@ -12,7 +13,7 @@ import {
 import type { AppConfig } from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, APP_OPTIONS);
   configureApp(app);
   // Close DB/Redis connections cleanly on SIGTERM (docker stop).
   app.enableShutdownHooks();

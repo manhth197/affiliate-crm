@@ -14,7 +14,10 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Trim } from '../../common/validation/transforms';
-import { IsVnPhone, VN_MOBILE_PATTERN } from '../../common/validation/vn-phone';
+import {
+  IsVnPhone,
+  VN_PHONE_API_PROPERTY,
+} from '../../common/validation/vn-phone';
 import { LeadStatus } from '../../generated/prisma/enums';
 
 /** 100 billion VND: generous upper bound that catches typos (extra zeros). */
@@ -35,7 +38,7 @@ export class CreateLeadDto {
   @MaxLength(100)
   customerName!: string;
 
-  @ApiProperty({ example: '0987654321', pattern: VN_MOBILE_PATTERN.source })
+  @ApiProperty(VN_PHONE_API_PROPERTY)
   @IsVnPhone()
   customerPhone!: string;
 

@@ -89,6 +89,7 @@ describe('Auth (e2e)', () => {
       expect(res.body).toEqual({
         statusCode: 409,
         error: 'Conflict',
+        code: 'EMAIL_TAKEN',
         message: 'Email is already registered',
       });
     });
@@ -168,6 +169,7 @@ describe('Auth (e2e)', () => {
         .send({ email: disabled.email, password: PASSWORD })
         .expect(403);
       expect(res.body.message).toBe('Account is disabled');
+      expect(res.body.code).toBe('ACCOUNT_DISABLED');
     });
 
     it('lets staff log in without an affiliate profile', async () => {

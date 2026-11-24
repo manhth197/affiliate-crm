@@ -8,7 +8,10 @@ import {
   MinLength,
 } from 'class-validator';
 import { Trim, TrimLowercase } from '../../common/validation/transforms';
-import { IsVnPhone, VN_MOBILE_PATTERN } from '../../common/validation/vn-phone';
+import {
+  IsVnPhone,
+  VN_PHONE_API_PROPERTY,
+} from '../../common/validation/vn-phone';
 import { Role } from '../../generated/prisma/enums';
 
 const STAFF_ROLES = [Role.STAFF, Role.ADMIN] as const;
@@ -35,7 +38,7 @@ export class CreateUserDto {
   @MaxLength(100)
   fullName!: string;
 
-  @ApiProperty({ example: '0987654321', pattern: VN_MOBILE_PATTERN.source })
+  @ApiProperty(VN_PHONE_API_PROPERTY)
   @IsVnPhone()
   phone!: string;
 

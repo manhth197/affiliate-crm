@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UserStatus } from '../generated/prisma/enums';
 import type { MeDto } from '../users/dto/user.dto';
 import { toMeDto } from '../users/user.mapper';
@@ -13,6 +8,7 @@ import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 import { PasswordService } from '../users/password.service';
 import { TokenService } from './token.service';
+import { conflict, ErrorCode, forbidden } from '../common/errors/error-codes';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +23,7 @@ export class AuthService {
     // Cheap pre-check so a duplicate does not pay for argon2. The unique index
     // still catches a concurrent duplicate (see UsersService.createAffiliate).
     if (await this.users.findByEmail(dto.email)) {
-      throw new ConflictException('Email is already registered');
+      throw conflict(ErrorCode.EMAIL_TAKEN, 'Email is already registered');
     }
     const user = await this.users.createAffiliate({
       email: dto.email,
@@ -49,7 +45,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Account is disabled');
+      throw forbidden(ErrorCode.ACCOUNT_DISABLED, 'Account is disabled');
     }
     const tokens = await this.tokens.issueTokenPair(user);
     return { user: toMeDto(user), ...tokens };

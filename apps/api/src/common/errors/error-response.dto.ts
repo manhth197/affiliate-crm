@@ -1,4 +1,5 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ErrorCode } from './error-codes';
 
 /** One invalid field in a 400 response. */
 @ApiSchema({ name: 'ErrorDetail' })
@@ -15,6 +16,14 @@ export class ErrorResponseDto {
   statusCode!: number;
   /** @example "Bad Request" */
   error!: string;
+
+  /** Machine-readable code on business errors (403 disabled account, 409, 422). */
+  @ApiProperty({
+    enum: Object.values(ErrorCode),
+    enumName: 'ErrorCode',
+    required: false,
+  })
+  code?: ErrorCode;
   /** @example "Validation failed" */
   message!: string;
   details?: ErrorDetailDto[];

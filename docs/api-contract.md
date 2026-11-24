@@ -1,9 +1,10 @@
-# Affiliate CRM — API Contract v0.3
+# Affiliate CRM — API Contract v0.4
 
 Source of truth for `apps/api` and `apps/web`. Changes go through the coordinator (see `_dieu-phoi/CONVENTIONS.md`). Once the API runs, `docs/openapi.json` (exported from Swagger) must match this document.
 
 ## Changelog
-- **v0.3 (2026-11-24)**: machine-readable `code` on business errors; lead business rules (duplicate open lead, 422 cases, concurrent update, assign rules, CCCD format); `LeadActivity.assignee`; `assignedStaffId=none`; `q` is case- and accent-insensitive; `sort` whitelist; CSV export rules.
+- **v0.4 (2026-11-24)**: error codes `CANNOT_DISABLE_SELF`, `DISBURSED_AMOUNT_REQUIRED`, `INVALID_COMMISSION_STATUS`; commission approve/cancel rules; webhook partner scoping and partner config; socket disconnect on token expiry; notification `data` shapes.
+- v0.3 (2026-11-24): machine-readable `code` on business errors; lead business rules (duplicate open lead, 422 cases, concurrent update, assign rules, CCCD format); `LeadActivity.assignee`; `assignedStaffId=none`; `q` is case- and accent-insensitive; `sort` whitelist; CSV export rules.
 - v0.2 (2026-11-24): disabled accounts get 403; logout always 204; unknown body properties → 400; phone/email normalization; `expiresIn` in token responses; refresh tokens are single-use (clients must single-flight refresh); date-range and timezone rules; new `GET /staff`; new `PATCH /auth/me` (planned for M4); decision-record naming.
 - v0.1 (2026-11-24): first version.
 
@@ -24,7 +25,7 @@ Source of truth for `apps/api` and `apps/web`. Changes go through the coordinato
   { "statusCode": 400, "error": "Bad Request", "message": "Validation failed", "details": [{ "field": "customerPhone", "message": "must be a valid VN phone number" }] }
   ```
   Codes used: 400 validation, 401 not logged in / bad token, 403 wrong role or not owner, 404, 409 conflict (e.g. invalid status transition, duplicate email), 422 business rule, 429 rate limit.
-- Business errors (403 disabled account, 409, 422) also carry a machine-readable `code` so the web can show its own Vietnamese message: `ACCOUNT_DISABLED`, `EMAIL_TAKEN`, `DUPLICATE_LEAD`, `INVALID_TRANSITION`, `CONCURRENT_UPDATE`, `PRODUCT_UNAVAILABLE`, `AMOUNT_NOT_ALLOWED`, `ASSIGNEE_NOT_STAFF`. Example: `{ "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_LEAD", "message": "This customer already has an open lead for this product" }`.
+- Business errors (403 disabled account, 409, 422) also carry a machine-readable `code` so the web can show its own Vietnamese message: `ACCOUNT_DISABLED`, `EMAIL_TAKEN`, `DUPLICATE_LEAD`, `INVALID_TRANSITION`, `CONCURRENT_UPDATE`, `PRODUCT_UNAVAILABLE`, `AMOUNT_NOT_ALLOWED`, `ASSIGNEE_NOT_STAFF`, `CANNOT_DISABLE_SELF` (422, an admin disabling their own account), `DISBURSED_AMOUNT_REQUIRED` (422, webhook `DISBURSED` without an amount), `INVALID_COMMISSION_STATUS` (409, approve/cancel from the wrong status). The OpenAPI enum `ErrorCode` lists them all. Example: `{ "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_LEAD", "message": "This customer already has an open lead for this product" }`.
 - Roles: `ADMIN`, `STAFF`, `AFFILIATE`. "Owner" = the affiliate who created the lead.
 
 ## Enums
@@ -124,8 +125,8 @@ Lead business rules:
 | `GET /commissions` | any | `?status=&affiliateId=&month=YYYY-MM&page=&pageSize=` | `200 Paginated<Commission>` (AFFILIATE: own only) |
 |---|---|---|---|
 | `GET /commissions/summary` | AFFILIATE | – | `200 {pending, approved, paid, totalLeads, disbursedLeads}` (amounts in VND) |
-| `PATCH /commissions/:id/approve` | ADMIN | – | `200 Commission` (PENDING → APPROVED) |
-| `PATCH /commissions/:id/cancel` | ADMIN | `{reason}` | `200 Commission` |
+| `PATCH /commissions/:id/approve` | ADMIN | – | `200 Commission` (PENDING → APPROVED; otherwise 409 `INVALID_COMMISSION_STATUS`) |
+| `PATCH /commissions/:id/cancel` | ADMIN | `{reason}` | `200 Commission` (only from `PENDING` or `APPROVED` and not yet in a payout; otherwise 409 `INVALID_COMMISSION_STATUS`) |
 | `GET /payouts` | any | `?status=&month=&affiliateId=&page=&pageSize=` | `200 Paginated<Payout>` (AFFILIATE: own only) |
 | `POST /payouts/generate` | ADMIN | `{month: "YYYY-MM"}` | `202 {jobId}` (BullMQ job; creates DRAFT payouts from APPROVED commissions) |
 | `PATCH /payouts/:id/confirm` | ADMIN | – | `200 Payout` (DRAFT → CONFIRMED) |
@@ -156,7 +157,8 @@ Lead business rules:
 `POST /webhooks/partner-status` — public, signed.
 - Headers: `X-Partner-Id`, `X-Timestamp` (unix seconds), `X-Signature` = hex HMAC-SHA256 of `${timestamp}.${rawBody}` with the partner secret.
 - Body: `{eventId, leadCode, status: "APPROVED" | "REJECTED" | "DISBURSED", disbursedAmount?, note?}`
-- Responses: `200 {ok: true}`; repeated `eventId` → `200 {ok: true, duplicate: true}`; bad signature or timestamp older than 5 min → 401; unknown lead → 404; invalid transition → 409.
+- Responses: `200 {ok: true}`; repeated `eventId` → `200 {ok: true, duplicate: true}`; bad signature or timestamp more than 5 min off → 401; unknown lead **or a lead of another partner's product** → 404 (same response, nothing leaked); invalid body after a valid signature (incl. unknown properties) → 400; `DISBURSED` without `disbursedAmount` → 422 `DISBURSED_AMOUNT_REQUIRED`; invalid transition → 409.
+- Partners are configured by the env var `PARTNER_WEBHOOKS` (JSON `[{id, name, secret}]`); `name` must equal `Product.partnerName`, and a partner can only update leads of its own products. A `Partner` table with admin screens is future work.
 
 ### Health
 `GET /health` → `200 {status: "ok", db: "up", redis: "up"}`
@@ -168,7 +170,13 @@ Lead business rules:
   - `notification:new` → `Notification`
   - `lead:updated` → `{leadId: string, status: LeadStatus, updatedAt: string}` (sent to the owner and to `role:STAFF`, `role:ADMIN`)
   - `payout:updated` → `{payoutId: string, status: PayoutStatus}`
-- No client → server events in v0.1.
+- No client → server events.
+- When the access token expires, the server disconnects the socket (`disconnect` reason `io server disconnect`). The client refreshes its token, then reconnects with the new one.
+- Notification `data` is always a string map:
+  - `LEAD_STATUS_CHANGED`: `{leadId, leadCode, status}`
+  - `LEAD_ASSIGNED`: `{leadId, leadCode}`
+  - `COMMISSION_CREATED`: `{commissionId, leadId, leadCode, amount}` (`amount` is a numeric string, VND)
+  - `PAYOUT_PAID`: `{payoutId, periodMonth, totalAmount}` (defined in M4)
 
 ## Seed data (for dev and demo)
 - `admin@demo.vn`, `staff@demo.vn`, `ctv1@demo.vn` … `ctv3@demo.vn`, all with password `Demo@12345`.
