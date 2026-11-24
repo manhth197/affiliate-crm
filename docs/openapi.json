@@ -2178,7 +2178,7 @@
     },
     "/api/v1/payouts/generate": {
       "post": {
-        "description": "Groups APPROVED commissions created in the month (Vietnam calendar) per affiliate. Safe to run again: DRAFT payouts are topped up, CONFIRMED/PAID ones are left alone.",
+        "description": "Per affiliate, puts every APPROVED commission not yet in a payout and created before the end of the month (Vietnam calendar) into the DRAFT payout of that month, so late approvals roll into the next payout. Safe to run again: DRAFT payouts are recalculated, CONFIRMED/PAID ones are never changed.",
         "operationId": "Payouts_generate",
         "parameters": [],
         "requestBody": {
@@ -4140,7 +4140,7 @@
         "properties": {
           "month": {
             "type": "string",
-            "description": "Month whose APPROVED commissions are paid out (Vietnam calendar).",
+            "description": "Payout period (Vietnam calendar); includes APPROVED commissions created up to its end.",
             "example": "2026-11"
           }
         },

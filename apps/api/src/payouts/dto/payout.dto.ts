@@ -67,7 +67,7 @@ export class ListPayoutsQueryDto extends IntersectionType(
 
 @ApiSchema({ name: 'GeneratePayoutsRequest' })
 export class GeneratePayoutsDto {
-  /** Month whose APPROVED commissions are paid out (Vietnam calendar). @example "2026-11" */
+  /** Payout period (Vietnam calendar); includes APPROVED commissions created up to its end. @example "2026-11" */
   @IsMonth()
   month!: string;
 }
