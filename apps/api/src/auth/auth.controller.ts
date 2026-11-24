@@ -30,6 +30,7 @@ import {
 } from '@nestjs/swagger';
 import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { EmptyBodyDto } from '../common/dto/empty-body.dto';
 import { ErrorResponseDto } from '../common/errors/error-response.dto';
 import { MeDto } from '../users/dto/user.dto';
 import type { AuthUser } from './auth.types';
@@ -38,13 +39,12 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { AuthResponseDto, TokenPairDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import {
   isJsonRequest,
+  readRefreshCookie,
   REFRESH_COOKIE,
-  resolveRefreshToken,
 } from './refresh-cookie';
 import { RefreshCookieService } from './refresh-cookie.service';
 
@@ -82,9 +82,9 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
-    const result = await this.auth.register(dto);
-    this.cookies.set(response, result.refreshToken);
-    return result;
+    const { refreshToken, ...body } = await this.auth.register(dto);
+    this.cookies.set(response, refreshToken);
+    return body;
   }
 
   @Public()
@@ -105,9 +105,9 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
-    const result = await this.auth.login(dto);
-    this.cookies.set(response, result.refreshToken);
-    return result;
+    const { refreshToken, ...body } = await this.auth.login(dto);
+    this.cookies.set(response, refreshToken);
+    return body;
   }
 
   @Public()
@@ -115,9 +115,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth('refreshCookie')
   @ApiOperation({
-    summary: 'Exchange a refresh token for a new token pair',
+    summary: 'New access token from the crm_rt cookie',
     description:
-      'Uses `refreshToken` from the body if present (deprecated), otherwise the `crm_rt` cookie; cookie calls must be `Content-Type: application/json`. ' +
+      'Reads the refresh token from the httpOnly `crm_rt` cookie (the only transport since contract v0.7) and rotates it. ' +
+      'Send `Content-Type: application/json` with an empty body `{}`; any body property → 400. ' +
       'Refresh tokens are single use: reusing an old one revokes the whole session (401). On 401/403 the cookie is cleared.',
   })
   @ApiOkResponse({ type: TokenPairDto, headers: SET_COOKIE_HEADER })
@@ -134,15 +135,12 @@ export class AuthController {
     description: 'Cookie call without Content-Type: application/json',
   })
   async refresh(
-    @Body() dto: RefreshTokenDto,
+    @Body() _body: EmptyBodyDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<TokenPairDto> {
-    const { token, fromCookie } = resolveRefreshToken(
-      dto.refreshToken,
-      request,
-    );
-    if (fromCookie && token && !isJsonRequest(request)) {
+    const token = readRefreshCookie(request);
+    if (token && !isJsonRequest(request)) {
       throw new UnsupportedMediaTypeException(
         'Cookie-based refresh requires Content-Type: application/json',
       );
@@ -151,9 +149,9 @@ export class AuthController {
       throw new UnauthorizedException('Missing refresh token');
     }
     try {
-      const pair = await this.auth.refresh(token);
-      this.cookies.set(response, pair.refreshToken);
-      return pair;
+      const { refreshToken, ...body } = await this.auth.refresh(token);
+      this.cookies.set(response, refreshToken);
+      return body;
     } catch (error) {
       // A dead token should not keep being sent by the browser.
       if (
@@ -172,17 +170,17 @@ export class AuthController {
   @ApiOperation({
     summary: 'End this session',
     description:
-      'Revokes the refresh token from the body (deprecated) or the `crm_rt` cookie, and always clears the cookie.',
+      'Revokes the refresh token in the `crm_rt` cookie and always clears the cookie. Empty body `{}`.',
   })
   @ApiNoContentResponse()
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
   async logout(
     @CurrentUser() user: AuthUser,
-    @Body() dto: RefreshTokenDto,
+    @Body() _body: EmptyBodyDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const { token } = resolveRefreshToken(dto.refreshToken, request);
+    const token = readRefreshCookie(request);
     if (token) {
       await this.auth.logout(user.id, token);
     }

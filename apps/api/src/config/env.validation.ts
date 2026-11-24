@@ -90,6 +90,16 @@ export class EnvironmentVariables {
   })
   @IsBoolean()
   COOKIE_SECURE: boolean = false;
+
+  /**
+   * Number of reverse proxies in front of the API (e.g. 1 behind Caddy). Lets
+   * Express take the client IP from X-Forwarded-For, which the auth rate
+   * limiter keys on. 0 = not behind a proxy (never trust the header).
+   */
+  @IsInt()
+  @Min(0)
+  @Max(5)
+  TRUST_PROXY: number = 0;
 }
 
 export function validateEnv(

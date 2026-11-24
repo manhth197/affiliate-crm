@@ -3,7 +3,7 @@ import {
   isJsonRequest,
   REFRESH_COOKIE,
   refreshCookieOptions,
-  resolveRefreshToken,
+  readRefreshCookie,
 } from './refresh-cookie';
 
 function request(
@@ -28,25 +28,15 @@ describe('refresh cookie', () => {
     expect(refreshCookieOptions(true, 7).secure).toBe(true);
   });
 
-  it('prefers the body token, then the cookie', () => {
-    const req = request({ [REFRESH_COOKIE]: 'from-cookie' });
-    expect(resolveRefreshToken('from-body', req)).toEqual({
-      token: 'from-body',
-      fromCookie: false,
-    });
-    expect(resolveRefreshToken(undefined, req)).toEqual({
-      token: 'from-cookie',
-      fromCookie: true,
-    });
-  });
-
-  it('returns no token when neither is present', () => {
+  it('reads the token from the crm_rt cookie only', () => {
     expect(
-      resolveRefreshToken(undefined, request(undefined)).token,
-    ).toBeUndefined();
+      readRefreshCookie(request({ [REFRESH_COOKIE]: 'from-cookie' })),
+    ).toBe('from-cookie');
+    expect(readRefreshCookie(request(undefined))).toBeUndefined();
     expect(
-      resolveRefreshToken(undefined, request({ [REFRESH_COOKIE]: '' })).token,
+      readRefreshCookie(request({ [REFRESH_COOKIE]: '' })),
     ).toBeUndefined();
+    expect(readRefreshCookie(request({ other: 'x' }))).toBeUndefined();
   });
 
   it.each([
