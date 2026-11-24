@@ -5,18 +5,18 @@ import { tokenStore } from '@/api/token-store'
 import { AppProviders } from '@/app-providers'
 import { createQueryClient } from '@/lib/query-client'
 import { findUserByEmail } from '@/mocks/db'
-import { issueTokens } from '@/mocks/tokens'
+import { startMockSession } from '@/mocks/tokens'
 import { connectMock } from '@/realtime/mock-connection'
 import { routes } from '@/routes'
 
 export type DemoEmail =
   'admin@demo.vn' | 'staff@demo.vn' | 'ctv1@demo.vn' | 'ctv2@demo.vn' | 'ctv3@demo.vn'
 
-/** Start a session for a seed user directly in the mock DB (skips the login form). */
+/** A logged-in browser for a seed user: mock session + refresh cookie + access token. */
 export function signInAs(email: DemoEmail) {
   const user = findUserByEmail(email)
   if (!user) throw new Error(`Unknown seed user ${email}`)
-  tokenStore.setTokens(issueTokens(user.id))
+  tokenStore.setTokens(startMockSession(user.id))
   return user
 }
 

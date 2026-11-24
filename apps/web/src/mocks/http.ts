@@ -14,6 +14,7 @@ const STATUS_TEXT: Record<number, string> = {
   404: 'Not Found',
   409: 'Conflict',
   422: 'Unprocessable Entity',
+  415: 'Unsupported Media Type',
   429: 'Too Many Requests',
 }
 
@@ -22,10 +23,11 @@ export function apiError(
   status: number,
   message: string,
   details?: ApiErrorBody['details'],
+  headers?: HeadersInit,
 ): Response {
   return HttpResponse.json<ApiErrorBody>(
     { statusCode: status, error: STATUS_TEXT[status] ?? 'Error', message, details },
-    { status },
+    { status, headers },
   )
 }
 
@@ -34,10 +36,11 @@ export function businessError(
   status: 403 | 409 | 422,
   code: ApiErrorCode,
   message: string,
+  headers?: HeadersInit,
 ): Response {
   return HttpResponse.json<ApiErrorBody>(
     { statusCode: status, error: STATUS_TEXT[status] ?? 'Error', code, message },
-    { status },
+    { status, headers },
   )
 }
 
