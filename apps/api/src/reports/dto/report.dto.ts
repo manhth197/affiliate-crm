@@ -45,6 +45,8 @@ function recordOf(
     properties,
     required: [...keys],
     additionalProperties: false,
+    // `required` above lists the keys inside the map; this marks the map itself required.
+    selfRequired: true,
   };
 }
 

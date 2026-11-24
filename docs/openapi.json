@@ -4302,6 +4302,8 @@
           }
         },
         "required": [
+          "leadsByStatus",
+          "commissionByStatus",
           "conversionRate",
           "disbursedAmount",
           "leadsPerDay"
