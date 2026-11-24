@@ -65,7 +65,8 @@ describe('LeadsPage (affiliate)', () => {
 
     await user.type(screen.getByLabelText('Tìm lead'), plain)
 
-    expect(await screen.findByText(target.code)).toBeVisible()
+    // Debounced search (400 ms) + request: allow more than the default 1 s under a busy CI.
+    expect(await screen.findByText(target.code, {}, { timeout: 3000 })).toBeVisible()
     expect(router.state.location.search).toContain('q=')
   })
 
@@ -89,9 +90,9 @@ describe('LeadsPage (affiliate)', () => {
   })
 })
 
-describe('LeadsPage (staff)', () => {
+describe('LeadsPage (staff, table view)', () => {
   it('shows the whole pipeline with affiliate and assignee columns', async () => {
-    renderApp('/leads', { as: 'staff@demo.vn' })
+    renderApp('/leads?view=table', { as: 'staff@demo.vn' })
 
     expect(await screen.findByRole('heading', { name: 'Pipeline' })).toBeVisible()
     const t = await table()

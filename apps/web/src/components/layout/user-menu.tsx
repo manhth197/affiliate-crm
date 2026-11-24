@@ -1,5 +1,6 @@
 import { ChevronsUpDown, LogOut } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useCurrentUser, useAuth } from '@/auth/auth-context'
 import { ROLE_LABELS } from '@/auth/roles'
 import { getInitials } from '@/lib/format'
@@ -17,11 +18,15 @@ import {
 export function UserMenu() {
   const user = useCurrentUser()
   const { logout } = useAuth()
+  const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
 
   async function handleLogout() {
     setLoggingOut(true)
     await logout()
+    // Replace the guard's redirect (which remembers this page) with a plain /login, so the
+    // next person to log in on this device starts at their own home page.
+    void navigate('/login', { replace: true })
   }
 
   return (

@@ -1,13 +1,11 @@
 /**
- * Types for the Affiliate CRM API (contract v0.3).
+ * Types for the Affiliate CRM API (contract v0.4).
  *
  * - Everything the API already exports in `docs/openapi.json` comes from the generated
  *   `schema.gen.ts` (regenerate with `npm run gen:api`), so a change in the API breaks our build
  *   instead of production.
- * - The rest (commissions, payouts, notifications, reports) is written by hand from
- *   `docs/api-contract.md` until the API exports it.
- * - Where the contract is ahead of the current export, the extra field is added as optional and
- *   marked "contract v0.3".
+ * - The rest (payouts, reports) is written by hand from `docs/api-contract.md` until the API
+ *   exports it.
  */
 import type { components } from './schema.gen'
 
@@ -40,23 +38,19 @@ export type ChangeLeadStatusRequest = Schemas['ChangeLeadStatusRequest']
 export type AssignLeadRequest = Schemas['AssignLeadRequest']
 export type AddLeadNoteRequest = Schemas['AddLeadNoteRequest']
 
-/** Contract v0.3: business errors carry a machine-readable `code`. */
-export type ApiErrorCode =
-  | 'ACCOUNT_DISABLED'
-  | 'EMAIL_TAKEN'
-  | 'DUPLICATE_LEAD'
-  | 'INVALID_TRANSITION'
-  | 'CONCURRENT_UPDATE'
-  | 'PRODUCT_UNAVAILABLE'
-  | 'AMOUNT_NOT_ALLOWED'
-  | 'ASSIGNEE_NOT_STAFF'
-export type ApiErrorBody = Schemas['ErrorResponse'] & { code?: ApiErrorCode | (string & {}) }
+/** Machine-readable code on business errors (403 disabled account, 409, 422). */
+export type ApiErrorCode = Schemas['ErrorCode']
+export type ApiErrorBody = Schemas['ErrorResponse']
+export type LeadActivity = Schemas['LeadActivity']
 
-/**
- * Contract v0.3: `assignee` is set on ASSIGNED entries. The current export does not have it
- * yet (it puts the assignee's name in `note`), so it is optional here.
- */
-export type LeadActivity = Schemas['LeadActivity'] & { assignee?: UserRef | null }
+export type CommissionStatus = Schemas['CommissionStatus']
+export type Commission = Schemas['Commission']
+export type CommissionSummary = Schemas['CommissionSummary']
+export type CancelCommissionRequest = Schemas['CancelCommissionRequest']
+
+export type NotificationType = Schemas['NotificationType']
+export type Notification = Schemas['Notification']
+export type NotificationPage = Schemas['PaginatedNotifications']
 
 // ---- Enum values (checked against the generated unions) ----
 export const ROLES = ['ADMIN', 'STAFF', 'AFFILIATE'] as const satisfies readonly Role[]
@@ -69,10 +63,7 @@ export const LEAD_STATUSES = [
   'REJECTED',
 ] as const satisfies readonly LeadStatus[]
 
-export type CommissionStatus = 'PENDING' | 'APPROVED' | 'PAID' | 'CANCELLED'
 export type PayoutStatus = 'DRAFT' | 'CONFIRMED' | 'PAID'
-export type NotificationType =
-  'LEAD_STATUS_CHANGED' | 'COMMISSION_CREATED' | 'PAYOUT_PAID' | 'LEAD_ASSIGNED'
 
 /** Allowed lead transitions (anything else is a 409 INVALID_TRANSITION from the API). */
 export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
@@ -93,24 +84,6 @@ export type Paginated<T> = { data: T[]; meta: Schemas['PageMeta'] }
 export type PageQuery = { page?: number; pageSize?: number }
 
 // ---- Hand-written (not in the OpenAPI export yet) ----
-export type Commission = {
-  id: string
-  lead: { id: string; code: string; customerName: string }
-  affiliate: UserRef
-  amount: number
-  status: CommissionStatus
-  payoutId: string | null
-  createdAt: IsoDateString
-}
-
-export type CommissionSummary = {
-  pending: number
-  approved: number
-  paid: number
-  totalLeads: number
-  disbursedLeads: number
-}
-
 export type Payout = {
   id: string
   affiliate: UserRef
@@ -122,19 +95,6 @@ export type Payout = {
   paidAt: IsoDateString | null
   createdAt: IsoDateString
 }
-
-export type Notification = {
-  id: string
-  type: NotificationType
-  title: string
-  body: string
-  /** e.g. { leadId, status } */
-  data: Record<string, string>
-  readAt: IsoDateString | null
-  createdAt: IsoDateString
-}
-
-export type NotificationPage = Paginated<Notification> & { unreadCount: number }
 
 export type ReportsOverview = {
   leadsByStatus: Record<LeadStatus, number>

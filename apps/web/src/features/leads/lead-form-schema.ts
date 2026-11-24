@@ -27,7 +27,7 @@ export function createLeadFormSchema(products: readonly Product[]) {
           (value) => value === '' || /^(\d{9}|\d{12})$/.test(value),
           'Số CMND/CCCD gồm 9 hoặc 12 chữ số',
         ),
-      requestedAmount: z.number().int().optional(),
+      requestedAmount: z.number().int().nullish(),
       note: z.string().trim().max(1000, 'Ghi chú tối đa 1.000 ký tự'),
     })
     .superRefine((values, ctx) => {
@@ -35,7 +35,7 @@ export function createLeadFormSchema(products: readonly Product[]) {
       if (product?.category !== 'LOAN') return
       const amount = values.requestedAmount
       const message =
-        amount === undefined
+        amount === null || amount === undefined
           ? 'Vui lòng nhập số tiền khách muốn vay'
           : amount < MIN_LOAN_AMOUNT
             ? 'Số tiền tối thiểu là 1.000.000 ₫'
@@ -63,7 +63,7 @@ export function toCreateLeadRequest(
     customerPhone: values.customerPhone,
     ...(values.customerNationalId && { customerNationalId: values.customerNationalId }),
     ...(product?.category === 'LOAN' &&
-      values.requestedAmount !== undefined && { requestedAmount: values.requestedAmount }),
+      values.requestedAmount != null && { requestedAmount: values.requestedAmount }),
     ...(values.note && { note: values.note }),
   }
 }
