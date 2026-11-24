@@ -35,7 +35,7 @@ Open http://localhost:5173. Demo accounts (password `Demo@12345`): `admin@demo.v
 | `npm run dev` / `dev:mock`        | Dev server (real API / mock API)                            |
 | `npm test`                        | Vitest, once (`test:watch` for watch mode)                  |
 | `npm run lint`                    | ESLint                                                      |
-| `npm run typecheck`               | `tsc -b`                                                    |
+| `npm run typecheck`               | `tsc -b` for the app, the config files and `e2e/`           |
 | `npm run format` / `format:check` | Prettier                                                    |
 | `npm run build` / `build:mock`    | Production build to `dist/` (real API / mock API demo)      |
 | `npm run gen:api`                 | Regenerate `src/api/schema.gen.ts` from `docs/openapi.json` |
@@ -83,7 +83,7 @@ It uses an installed browser (`E2E_CHANNEL=msedge` by default, or `chrome`); bro
 
 ## CI
 
-`.github/workflows/web.yml` runs on changes to `apps/web/**` or `docs/openapi.json`: the generated API types must match `docs/openapi.json`, then lint, typecheck, format check, Vitest, production build, and a build of the Docker image.
+`.github/workflows/web.yml` runs on changes to `apps/web/**` or `docs/openapi.json` (or by hand from the Actions tab): the generated API types must match `docs/openapi.json`, then lint, typecheck, format check, Vitest, production build, and a build of the Docker image.
 
 ## Code map
 

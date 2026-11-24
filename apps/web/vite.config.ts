@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
       // Playwright specs (e2e/) need a running stack; `npm run e2e` runs them.
       exclude: [...configDefaults.exclude, 'e2e/**'],
       restoreMocks: true,
+      // The default is one worker per CPU thread (~300 MB each with jsdom); three keep the
+      // run fast without starving a shared machine. CI runners have fewer cores anyway.
+      maxWorkers: 3,
     },
   }
 })
