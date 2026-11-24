@@ -7,7 +7,12 @@ import type { TokenPair } from './types'
  */
 export const REFRESH_TOKEN_KEY = 'affiliate-crm.refreshToken'
 
+/** Treat the access token as expired this long before it really expires (slow networks). */
+export const EXPIRY_MARGIN_MS = 30_000
+
 let accessToken: string | null = null
+/** When the access token stops being usable (from the API's `expiresIn`). */
+let accessTokenExpiresAt = 0
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -23,12 +28,20 @@ function readRefreshToken(): string | null {
 }
 
 export const tokenStore = {
-  getAccessToken: () => accessToken,
+  /**
+   * The access token, or null if there is none or it is about to expire; the API client then
+   * refreshes first instead of sending a request that would come back 401.
+   */
+  getAccessToken: () =>
+    accessToken && Date.now() < accessTokenExpiresAt - EXPIRY_MARGIN_MS ? accessToken : null,
   getRefreshToken: readRefreshToken,
   hasSession: () => readRefreshToken() !== null,
 
   setTokens(tokens: TokenPair) {
     accessToken = tokens.accessToken
+    // Fall back to the documented 15 minutes if an older API omits `expiresIn`.
+    const lifetimeSeconds = Number.isFinite(tokens.expiresIn) ? tokens.expiresIn : 900
+    accessTokenExpiresAt = Date.now() + lifetimeSeconds * 1000
     try {
       localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken)
     } catch {

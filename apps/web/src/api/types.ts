@@ -1,17 +1,65 @@
 /**
- * Types for the Affiliate CRM API, written by hand from `docs/api-contract.md` (v0.1).
- * Will be replaced by types generated with `openapi-typescript` once `docs/openapi.json` exists.
+ * Types for the Affiliate CRM API (contract v0.3).
+ *
+ * - Everything the API already exports in `docs/openapi.json` comes from the generated
+ *   `schema.gen.ts` (regenerate with `npm run gen:api`), so a change in the API breaks our build
+ *   instead of production.
+ * - The rest (commissions, payouts, notifications, reports) is written by hand from
+ *   `docs/api-contract.md` until the API exports it.
+ * - Where the contract is ahead of the current export, the extra field is added as optional and
+ *   marked "contract v0.3".
  */
+import type { components } from './schema.gen'
 
-// ---- Enums ----
-export const ROLES = ['ADMIN', 'STAFF', 'AFFILIATE'] as const
-export type Role = (typeof ROLES)[number]
+type Schemas = components['schemas']
 
-export type UserStatus = 'ACTIVE' | 'DISABLED'
-export type ProductCategory = 'LOAN' | 'CREDIT_CARD' | 'INSURANCE'
+// ---- Generated from docs/openapi.json ----
+export type Role = Schemas['Role']
+export type UserStatus = Schemas['UserStatus']
+export type AffiliateProfile = Schemas['AffiliateProfile']
+export type Me = Schemas['Me']
+export type User = Schemas['User']
+export type UserRef = Schemas['UserRef']
+export type StaffMember = Schemas['StaffMember']
+export type LoginRequest = Schemas['LoginRequest']
+export type RegisterRequest = Schemas['RegisterRequest']
+export type TokenPair = Schemas['TokenPair']
+export type AuthResponse = Schemas['AuthResponse']
+export type Health = Schemas['Health']
+
+export type ProductCategory = Schemas['ProductCategory']
 /** PERCENT value is in basis points (150 = 1.5%); FIXED value is in VND. */
-export type CommissionType = 'PERCENT' | 'FIXED'
+export type CommissionType = Schemas['CommissionType']
+export type Product = Schemas['Product']
 
+export type LeadStatus = Schemas['LeadStatus']
+export type LeadActivityType = Schemas['LeadActivityType']
+export type Lead = Schemas['Lead']
+export type CreateLeadRequest = Schemas['CreateLeadRequest']
+export type ChangeLeadStatusRequest = Schemas['ChangeLeadStatusRequest']
+export type AssignLeadRequest = Schemas['AssignLeadRequest']
+export type AddLeadNoteRequest = Schemas['AddLeadNoteRequest']
+
+/** Contract v0.3: business errors carry a machine-readable `code`. */
+export type ApiErrorCode =
+  | 'ACCOUNT_DISABLED'
+  | 'EMAIL_TAKEN'
+  | 'DUPLICATE_LEAD'
+  | 'INVALID_TRANSITION'
+  | 'CONCURRENT_UPDATE'
+  | 'PRODUCT_UNAVAILABLE'
+  | 'AMOUNT_NOT_ALLOWED'
+  | 'ASSIGNEE_NOT_STAFF'
+export type ApiErrorBody = Schemas['ErrorResponse'] & { code?: ApiErrorCode | (string & {}) }
+
+/**
+ * Contract v0.3: `assignee` is set on ASSIGNED entries. The current export does not have it
+ * yet (it puts the assignee's name in `note`), so it is optional here.
+ */
+export type LeadActivity = Schemas['LeadActivity'] & { assignee?: UserRef | null }
+
+// ---- Enum values (checked against the generated unions) ----
+export const ROLES = ['ADMIN', 'STAFF', 'AFFILIATE'] as const satisfies readonly Role[]
 export const LEAD_STATUSES = [
   'NEW',
   'CONTACTED',
@@ -19,16 +67,14 @@ export const LEAD_STATUSES = [
   'APPROVED',
   'DISBURSED',
   'REJECTED',
-] as const
-export type LeadStatus = (typeof LEAD_STATUSES)[number]
+] as const satisfies readonly LeadStatus[]
 
 export type CommissionStatus = 'PENDING' | 'APPROVED' | 'PAID' | 'CANCELLED'
 export type PayoutStatus = 'DRAFT' | 'CONFIRMED' | 'PAID'
 export type NotificationType =
   'LEAD_STATUS_CHANGED' | 'COMMISSION_CREATED' | 'PAYOUT_PAID' | 'LEAD_ASSIGNED'
-export type LeadActivityType = 'CREATED' | 'STATUS_CHANGED' | 'ASSIGNED' | 'NOTE' | 'WEBHOOK'
 
-/** Allowed lead transitions (anything else is a 409 from the API). */
+/** Allowed lead transitions (anything else is a 409 INVALID_TRANSITION from the API). */
 export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
   NEW: ['CONTACTED', 'REJECTED'],
   CONTACTED: ['SUBMITTED', 'REJECTED'],
@@ -42,88 +88,15 @@ export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
 /** ISO 8601 UTC string. */
 export type IsoDateString = string
 
-export type Paginated<T> = {
-  data: T[]
-  meta: { page: number; pageSize: number; total: number }
-}
+export type Paginated<T> = { data: T[]; meta: Schemas['PageMeta'] }
 
 export type PageQuery = { page?: number; pageSize?: number }
 
-export type ApiErrorBody = {
-  statusCode: number
-  error: string
-  message: string
-  details?: { field: string; message: string }[]
-}
-
-// ---- Entities ----
-export type User = {
-  id: string
-  email: string
-  fullName: string
-  phone: string
-  role: Role
-  status: UserStatus
-  createdAt: IsoDateString
-}
-
-export type AffiliateProfile = {
-  userId: string
-  referralCode: string
-  bankName: string | null
-  bankAccountMasked: string | null
-}
-
-export type Me = User & { affiliate?: AffiliateProfile }
-
-export type Product = {
-  id: string
-  name: string
-  partnerName: string
-  category: ProductCategory
-  commissionType: CommissionType
-  commissionValue: number
-  active: boolean
-  createdAt: IsoDateString
-}
-
-export type Lead = {
-  id: string
-  /** Human-friendly code, e.g. "LD-000123". */
-  code: string
-  affiliate: { id: string; fullName: string; referralCode: string }
-  product: { id: string; name: string; partnerName: string }
-  customerName: string
-  /** Masked for AFFILIATE. */
-  customerPhone: string
-  /** Masked for AFFILIATE. */
-  customerNationalId: string | null
-  /** VND, loans only. */
-  requestedAmount: number | null
-  /** VND, set when DISBURSED. */
-  disbursedAmount: number | null
-  status: LeadStatus
-  assignedStaff: { id: string; fullName: string } | null
-  createdAt: IsoDateString
-  updatedAt: IsoDateString
-}
-
-export type LeadActivity = {
-  id: string
-  leadId: string
-  type: LeadActivityType
-  fromStatus: LeadStatus | null
-  toStatus: LeadStatus | null
-  note: string | null
-  /** null when the change came from the partner webhook. */
-  actor: { id: string; fullName: string } | null
-  createdAt: IsoDateString
-}
-
+// ---- Hand-written (not in the OpenAPI export yet) ----
 export type Commission = {
   id: string
   lead: { id: string; code: string; customerName: string }
-  affiliate: { id: string; fullName: string }
+  affiliate: UserRef
   amount: number
   status: CommissionStatus
   payoutId: string | null
@@ -140,7 +113,7 @@ export type CommissionSummary = {
 
 export type Payout = {
   id: string
-  affiliate: { id: string; fullName: string }
+  affiliate: UserRef
   /** "YYYY-MM" */
   periodMonth: string
   totalAmount: number
@@ -179,38 +152,22 @@ export type TopAffiliate = {
   commission: number
 }
 
-// ---- Auth ----
-export type LoginRequest = { email: string; password: string }
-export type RegisterRequest = { email: string; password: string; fullName: string; phone: string }
-export type AuthResponse = { user: Me; accessToken: string; refreshToken: string }
-export type TokenPair = { accessToken: string; refreshToken: string }
+// ---- Query strings ----
+export type LeadSortField = 'createdAt' | 'updatedAt' | 'requestedAmount' | 'disbursedAmount'
 
-// ---- Request bodies / queries (used from M2 on) ----
 export type LeadQuery = PageQuery & {
   status?: LeadStatus
   productId?: string
   affiliateId?: string
+  /** A staff id, or "none" for unassigned leads (contract v0.3). */
   assignedStaffId?: string
+  /** Name (case/accent-insensitive), lead code, or 3+ phone digits. */
   q?: string
+  /** ISO datetime, inclusive. */
   from?: string
+  /** ISO datetime, exclusive. */
   to?: string
-  sort?: string
-}
-
-export type CreateLeadRequest = {
-  productId: string
-  customerName: string
-  customerPhone: string
-  customerNationalId?: string
-  requestedAmount?: number
-  note?: string
-}
-
-export type ChangeLeadStatusRequest = {
-  status: LeadStatus
-  note?: string
-  /** Required when status is DISBURSED. */
-  disbursedAmount?: number
+  sort?: `${LeadSortField}:${'asc' | 'desc'}`
 }
 
 // ---- Realtime (Socket.IO, namespace /realtime) ----

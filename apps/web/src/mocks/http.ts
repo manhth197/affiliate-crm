@@ -1,5 +1,5 @@
 import { delay, HttpResponse } from 'msw'
-import type { ApiErrorBody, Role, User } from '@/api/types'
+import type { ApiErrorBody, ApiErrorCode, Role, User } from '@/api/types'
 import { config } from '@/config'
 import { findUserById } from './db'
 import { verifyAccessToken } from './tokens'
@@ -25,6 +25,18 @@ export function apiError(
 ): Response {
   return HttpResponse.json<ApiErrorBody>(
     { statusCode: status, error: STATUS_TEXT[status] ?? 'Error', message, details },
+    { status },
+  )
+}
+
+/** Business error with a machine-readable `code` (contract v0.3). */
+export function businessError(
+  status: 403 | 409 | 422,
+  code: ApiErrorCode,
+  message: string,
+): Response {
+  return HttpResponse.json<ApiErrorBody>(
+    { statusCode: status, error: STATUS_TEXT[status] ?? 'Error', code, message },
     { status },
   )
 }

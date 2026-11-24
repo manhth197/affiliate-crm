@@ -2,10 +2,15 @@ import type { RouteObject } from 'react-router'
 import { GuestOnly, RequireAuth, RequireRole } from '@/auth/guards'
 import { AppLayout } from '@/components/layout/app-layout'
 import { NotFoundScreen } from '@/components/status-screens'
-import { AuthLayout } from '@/pages/auth/auth-layout'
-import { LoginPage } from '@/pages/auth/login-page'
-import { RegisterPage } from '@/pages/auth/register-page'
-import { DashboardPage } from '@/pages/dashboard-page'
+import { AuthLayout } from '@/features/auth/auth-layout'
+import { LoginPage } from '@/features/auth/login-page'
+import { RegisterPage } from '@/features/auth/register-page'
+import { DashboardPage } from '@/features/dashboard/dashboard-page'
+import { CommissionsPage } from '@/features/finance/commissions-page'
+import { PayoutsPage } from '@/features/finance/payouts-page'
+import { LeadCreatePage } from '@/features/leads/lead-create-page'
+import { LeadDetailPage } from '@/features/leads/lead-detail-page'
+import { LeadsPage } from '@/features/leads/leads-page'
 import { PlaceholderPage } from '@/pages/placeholder-page'
 import { RouteErrorPage } from '@/pages/route-error-page'
 
@@ -37,25 +42,17 @@ export const routes: RouteObject[] = [
             element: <AppLayout />,
             children: [
               { index: true, element: <DashboardPage /> },
-              {
-                path: 'leads',
-                element: <PlaceholderPage title="Danh sách lead" />,
-              },
+              { path: 'leads', element: <LeadsPage /> },
               {
                 element: <RequireRole roles={['AFFILIATE']} />,
-                children: [
-                  {
-                    path: 'leads/new',
-                    element: <PlaceholderPage title="Giới thiệu khách hàng" />,
-                  },
-                ],
+                children: [{ path: 'leads/new', element: <LeadCreatePage /> }],
               },
-              { path: 'leads/:leadId', element: <PlaceholderPage title="Chi tiết lead" /> },
+              { path: 'leads/:leadId', element: <LeadDetailPage /> },
               {
                 element: <RequireRole roles={['ADMIN', 'AFFILIATE']} />,
                 children: [
-                  { path: 'commissions', element: <PlaceholderPage title="Hoa hồng" /> },
-                  { path: 'payouts', element: <PlaceholderPage title="Chi trả" /> },
+                  { path: 'commissions', element: <CommissionsPage /> },
+                  { path: 'payouts', element: <PayoutsPage /> },
                 ],
               },
               {

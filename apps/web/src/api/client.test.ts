@@ -70,6 +70,22 @@ describe('apiRequest', () => {
     expect(refresh.calls).toBe(1)
   })
 
+  it('refreshes before sending when the access token is about to expire', async () => {
+    useWhoAmIEndpoint()
+    const user = findUserByEmail('ctv1@demo.vn')!
+    // expiresIn below the safety margin: the token must not be used any more.
+    tokenStore.setTokens({ ...issueTokens(user.id), expiresIn: 10 })
+    const refresh = countRefreshCalls()
+    const unauthorized: string[] = []
+    server.events.on('response:mocked', ({ request, response }) => {
+      if (response.status === 401) unauthorized.push(request.url)
+    })
+
+    await expect(apiRequest('/test/whoami')).resolves.toEqual({ userId: user.id })
+    expect(refresh.calls).toBe(1)
+    expect(unauthorized).toEqual([])
+  })
+
   it('gets an access token first after a page reload (refresh token only)', async () => {
     useWhoAmIEndpoint()
     const { user, tokens } = startSession()

@@ -2,8 +2,9 @@ import { tz } from '@date-fns/tz'
 import { format, formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
+import { VN_TIME_ZONE } from './dates'
+
 /** All dates are shown in Vietnam time, whatever the browser's time zone is. */
-export const VN_TIME_ZONE = 'Asia/Ho_Chi_Minh'
 const inVietnam = tz(VN_TIME_ZONE)
 
 /** Non-breaking space, so "1.500.000 ₫" never wraps before the symbol. */
@@ -51,4 +52,10 @@ export function getInitials(fullName: string): string {
   const first = words[0]?.[0] ?? ''
   const last = words.length > 1 ? (words[words.length - 1]?.[0] ?? '') : ''
   return (first + last).toUpperCase()
+}
+
+/** "2026-10" → "Tháng 10/2026" */
+export function formatMonth(month: string): string {
+  const [year, m] = month.split('-')
+  return `Tháng ${Number(m)}/${year}`
 }

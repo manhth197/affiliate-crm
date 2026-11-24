@@ -1,11 +1,20 @@
 import { z } from 'zod'
 
-/** Vietnamese mobile number: 0 or +84, then a 9-digit number starting with 3, 5, 7, 8 or 9. */
-export const VN_PHONE_REGEX = /^(?:0|\+84)(?:3|5|7|8|9)\d{8}$/
+/**
+ * Vietnamese mobile number in local form (same pattern as the OpenAPI spec). Inputs like
+ * "+84 912.345.678" are converted with `toLocalPhone` before this check.
+ */
+export const VN_PHONE_REGEX = /^0[35789]\d{8}$/
 
 /** Strip spaces, dots and dashes users often type in phone numbers. */
 export function normalizePhone(value: string): string {
   return value.replace(/[\s.-]/g, '')
+}
+
+/** "+84 912.345.678" → "0912345678": the form the API stores and returns (contract v0.2). */
+export function toLocalPhone(value: string): string {
+  const compact = normalizePhone(value)
+  return compact.startsWith('+84') ? `0${compact.slice(3)}` : compact
 }
 
 export const emailField = z
@@ -16,7 +25,7 @@ export const emailField = z
 
 export const phoneField = z
   .string()
-  .transform(normalizePhone)
+  .transform(toLocalPhone)
   .pipe(
     z
       .string()

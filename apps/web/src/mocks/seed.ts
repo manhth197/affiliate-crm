@@ -1,4 +1,5 @@
 import type { AffiliateProfile, Product, User } from '@/api/types'
+import { createLeadSeed, type LeadSeed } from './seed-leads'
 
 /**
  * Demo data matching the "Seed data" section of docs/api-contract.md.
@@ -10,7 +11,7 @@ const DAY = 24 * 60 * 60 * 1000
 const daysAgo = (days: number, now: number) => new Date(now - days * DAY).toISOString()
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 
-export type SeedData = {
+export type SeedData = LeadSeed & {
   users: User[]
   passwords: Record<string, string>
   affiliates: AffiliateProfile[]
@@ -135,5 +136,5 @@ export function createSeed(now = Date.now()): SeedData {
 
   const passwords = Object.fromEntries(users.map((user) => [user.id, DEMO_PASSWORD]))
 
-  return { users, passwords, affiliates, products }
+  return { users, passwords, affiliates, products, ...createLeadSeed(users, products, now) }
 }

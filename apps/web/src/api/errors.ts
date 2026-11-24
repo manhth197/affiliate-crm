@@ -1,20 +1,36 @@
-import type { ApiErrorBody } from './types'
+import type { ApiErrorBody, ApiErrorCode } from './types'
 
 /** Error thrown by the API client for any non-2xx response (status 0 = network failure). */
 export class ApiError extends Error {
   readonly status: number
+  /** Machine-readable business error code (contract v0.3), e.g. "DUPLICATE_LEAD". */
+  readonly code: string | undefined
   readonly details: { field: string; message: string }[]
 
   constructor(status: number, body?: Partial<ApiErrorBody>) {
     super(body?.message ?? `Request failed with status ${status}`)
     this.name = 'ApiError'
     this.status = status
+    this.code = body?.code
     this.details = body?.details ?? []
   }
 }
 
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
+}
+
+/** The API speaks English; the user sees these. Business codes win over status codes. */
+const MESSAGES_BY_CODE: Record<ApiErrorCode, string> = {
+  ACCOUNT_DISABLED: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.',
+  EMAIL_TAKEN: 'Email này đã được đăng ký.',
+  DUPLICATE_LEAD: 'Khách hàng này đã có hồ sơ đang xử lý cho sản phẩm này.',
+  INVALID_TRANSITION: 'Không thể chuyển sang trạng thái này từ trạng thái hiện tại.',
+  CONCURRENT_UPDATE:
+    'Lead vừa được người khác cập nhật. Dữ liệu đã được tải lại, vui lòng thử lại.',
+  PRODUCT_UNAVAILABLE: 'Sản phẩm này hiện không nhận hồ sơ. Vui lòng chọn sản phẩm khác.',
+  AMOUNT_NOT_ALLOWED: 'Sản phẩm này không cần nhập số tiền vay.',
+  ASSIGNEE_NOT_STAFF: 'Chỉ có thể giao lead cho nhân viên hoặc quản trị viên đang hoạt động.',
 }
 
 const MESSAGES_BY_STATUS: Record<number, string> = {
@@ -28,17 +44,21 @@ const MESSAGES_BY_STATUS: Record<number, string> = {
   429: 'Bạn thao tác quá nhanh. Vui lòng đợi một lát rồi thử lại.',
 }
 
+export function hasErrorCode(error: unknown, code: ApiErrorCode): error is ApiError {
+  return isApiError(error) && error.code === code
+}
+
 /**
- * Vietnamese message for showing an error to the user. The API returns English messages,
- * so we map by status code; callers can pass overrides for context-specific wording.
+ * Vietnamese message for an error. Order: message for the business `code` (most specific) →
+ * caller override for the status → message for the status → generic.
  */
 export function getErrorMessage(error: unknown, overrides: Partial<Record<number, string>> = {}) {
-  if (isApiError(error)) {
-    return (
-      overrides[error.status] ??
-      MESSAGES_BY_STATUS[error.status] ??
-      'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
-    )
-  }
-  return 'Đã có lỗi xảy ra. Vui lòng thử lại.'
+  if (!isApiError(error)) return 'Đã có lỗi xảy ra. Vui lòng thử lại.'
+  const byCode = error.code ? MESSAGES_BY_CODE[error.code as ApiErrorCode] : undefined
+  return (
+    byCode ??
+    overrides[error.status] ??
+    MESSAGES_BY_STATUS[error.status] ??
+    'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
+  )
 }

@@ -26,7 +26,11 @@ export function verifyAccessToken(token: string, now = Date.now()): string | nul
 export function issueTokens(userId: string, now = Date.now()): TokenPair {
   const refreshToken = `mock-refresh.${crypto.randomUUID()}`
   db.sessions[refreshToken] = { userId, expiresAt: now + REFRESH_TOKEN_TTL_MS }
-  return { accessToken: createAccessToken(userId, now), refreshToken }
+  return {
+    accessToken: createAccessToken(userId, now),
+    refreshToken,
+    expiresIn: ACCESS_TOKEN_TTL_MS / 1000,
+  }
 }
 
 /**

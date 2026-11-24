@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { getErrorMessage, isApiError } from '@/api/errors'
+import { getErrorMessage, hasErrorCode, isApiError } from '@/api/errors'
 import { useAuth } from '@/auth/auth-context'
 import { TextField } from '@/components/form/text-field'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -53,7 +53,8 @@ export function RegisterPage() {
           : undefined,
       })
     } catch (error) {
-      if (isApiError(error) && error.status === 409) {
+      // EMAIL_TAKEN since contract v0.3; plain 409 kept for older API builds.
+      if (hasErrorCode(error, 'EMAIL_TAKEN') || (isApiError(error) && error.status === 409)) {
         setError('email', { type: 'server', message: 'Email này đã được đăng ký' })
         return
       }

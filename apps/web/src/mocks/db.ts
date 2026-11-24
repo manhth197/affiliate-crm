@@ -8,7 +8,8 @@ export type MockDb = SeedData & {
   sessions: Record<string, MockSession>
 }
 
-const STORAGE_KEY = 'affiliate-crm.mockDb.v1'
+// Bump the version when the shape changes, so stale saved data is ignored.
+const STORAGE_KEY = 'affiliate-crm.mockDb.v2'
 
 function freshDb(): MockDb {
   return { ...createSeed(), sessions: {} }
