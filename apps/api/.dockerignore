@@ -1,0 +1,14 @@
+# Only what the image build needs; never secrets or local artefacts.
+node_modules
+dist
+coverage
+src/generated
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+test
+**/*.spec.ts
+Dockerfile
+.dockerignore

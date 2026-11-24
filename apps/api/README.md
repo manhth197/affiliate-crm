@@ -97,6 +97,25 @@ curl -X POST http://localhost:3000/api/v1/webhooks/partner-status \
   -H "X-Timestamp: $TS" -H "X-Signature: $SIG" -d "$BODY"
 ```
 
+## Docker
+
+From the repo root:
+
+```bash
+# Postgres + Redis + migrations + the API (port 3000; set API_PORT to change it)
+JWT_ACCESS_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))") \
+  docker compose --profile app up -d --build
+docker compose --profile app run --rm migrate npx prisma db seed   # demo data
+docker compose --profile app down                                  # stop (keeps volumes)
+```
+
+- `apps/api/Dockerfile` is multi-stage: target `runtime` (the API, ~350 MB, non-root, health check) and target `migrate` (`prisma migrate deploy`, also used for seeding).
+- Do not run the Docker API and `npm run start:dev` at the same time: both use Redis DB 0 and their BullMQ workers would share jobs (realtime pushes would go to the wrong process).
+
+## CI
+
+`.github/workflows/api.yml` runs on changes to `apps/api/**`: lint, Prettier check, typecheck, unit tests, e2e tests against Postgres/Redis service containers, a check that `docs/openapi.json` is up to date (run `npm run openapi:export` and commit if it fails), then builds both Docker images.
+
 ## Known issues
 
 - Running the tests prints `DeprecationWarning: Calling client.query() when the client is already executing a query` from `pg`. It comes from inside Prisma 7.10's `@prisma/adapter-pg` (its query interpreter runs sub-queries of one transaction concurrently), not from this code. Harmless with `pg@8`; re-check when upgrading to `pg@9`, which removes that behaviour.
