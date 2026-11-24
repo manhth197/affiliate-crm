@@ -65,8 +65,12 @@ describe('LeadCreatePage', () => {
     await user.selectOptions(screen.getByLabelText('Sản phẩm'), productOption('LOAN').id)
 
     await user.type(screen.getByLabelText('Số tiền khách muốn vay'), '50000000')
-
     expect(screen.getByLabelText('Số tiền khách muốn vay')).toHaveValue('50.000.000')
+
+    // Regression: clearing must really empty the field (not restore the default value).
+    await user.clear(screen.getByLabelText('Số tiền khách muốn vay'))
+    await user.type(screen.getByLabelText('Số tiền khách muốn vay'), '20000000')
+    expect(screen.getByLabelText('Số tiền khách muốn vay')).toHaveValue('20.000.000')
   })
 
   it('creates the lead and opens its detail page', async () => {

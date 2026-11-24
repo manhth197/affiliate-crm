@@ -101,7 +101,7 @@ function LeadForm({ products }: { products: Product[] }) {
       customerName: '',
       customerPhone: '',
       customerNationalId: '',
-      requestedAmount: undefined,
+      requestedAmount: null,
       note: '',
     },
   })

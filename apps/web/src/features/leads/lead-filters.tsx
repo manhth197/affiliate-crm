@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
-import { useCallback } from 'react'
-import { LEAD_STATUSES, type Product } from '@/api/types'
+import { type CSSProperties, useCallback } from 'react'
+import { LEAD_STATUSES, type Product, type StaffMember } from '@/api/types'
 import { SearchInput } from '@/components/search-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,15 +10,24 @@ import { useLeadFilters } from './use-lead-filters'
 
 type LeadFiltersProps = {
   products: Product[]
+  /** Back office: show the "assigned to" filter with these people. */
+  staff?: StaffMember[]
+  /** Kanban: every column is a status, so the status filter is hidden. */
+  hideStatus?: boolean
 }
 
-export function LeadFilters({ products }: LeadFiltersProps) {
+export function LeadFilters({ products, staff, hideStatus = false }: LeadFiltersProps) {
   const { filters, hasFilters, update } = useLeadFilters()
   const onSearch = useCallback((q: string) => update({ q }), [update])
+  // One row on large screens: search + one column per select/date + "clear".
+  const columns = 4 + (staff ? 1 : 0) - (hideStatus ? 1 : 0)
 
   return (
     // Two columns on phones (search and "clear" take a full row), one row on large screens.
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]">
+    <div
+      className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,2fr)_repeat(var(--filter-columns),minmax(0,1fr))_auto]"
+      style={{ '--filter-columns': columns } as CSSProperties}
+    >
       <div className="col-span-2 lg:col-span-1">
         <SearchInput
           label="Tìm lead"
@@ -27,19 +36,38 @@ export function LeadFilters({ products }: LeadFiltersProps) {
           onSearch={onSearch}
         />
       </div>
-      <NativeSelect
-        aria-label="Trạng thái"
-        className="w-full"
-        value={filters.status}
-        onChange={(event) => update({ status: event.target.value })}
-      >
-        <NativeSelectOption value="">Tất cả trạng thái</NativeSelectOption>
-        {LEAD_STATUSES.map((status) => (
-          <NativeSelectOption key={status} value={status}>
-            {LEAD_STATUS_LABELS[status]}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      {!hideStatus && (
+        <NativeSelect
+          aria-label="Trạng thái"
+          className="w-full"
+          value={filters.status}
+          onChange={(event) => update({ status: event.target.value })}
+        >
+          <NativeSelectOption value="">Tất cả trạng thái</NativeSelectOption>
+          {LEAD_STATUSES.map((status) => (
+            <NativeSelectOption key={status} value={status}>
+              {LEAD_STATUS_LABELS[status]}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      )}
+      {staff && (
+        <NativeSelect
+          aria-label="Phụ trách"
+          className="w-full"
+          value={filters.assignee}
+          onChange={(event) => update({ assignee: event.target.value })}
+        >
+          <NativeSelectOption value="">Mọi người phụ trách</NativeSelectOption>
+          <NativeSelectOption value="me">Của tôi</NativeSelectOption>
+          <NativeSelectOption value="none">Chưa giao</NativeSelectOption>
+          {staff.map((member) => (
+            <NativeSelectOption key={member.id} value={member.id}>
+              {member.fullName}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      )}
       <NativeSelect
         aria-label="Sản phẩm"
         className="w-full"
@@ -71,7 +99,9 @@ export function LeadFilters({ products }: LeadFiltersProps) {
         <Button
           variant="ghost"
           className="col-span-2 lg:col-span-1"
-          onClick={() => update({ q: '', status: '', productId: '', from: '', to: '' })}
+          onClick={() =>
+            update({ q: '', status: '', productId: '', assignee: '', from: '', to: '' })
+          }
         >
           <X aria-hidden />
           Xóa lọc

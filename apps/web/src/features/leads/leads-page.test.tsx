@@ -89,9 +89,9 @@ describe('LeadsPage (affiliate)', () => {
   })
 })
 
-describe('LeadsPage (staff)', () => {
+describe('LeadsPage (staff, table view)', () => {
   it('shows the whole pipeline with affiliate and assignee columns', async () => {
-    renderApp('/leads', { as: 'staff@demo.vn' })
+    renderApp('/leads?view=table', { as: 'staff@demo.vn' })
 
     expect(await screen.findByRole('heading', { name: 'Pipeline' })).toBeVisible()
     const t = await table()

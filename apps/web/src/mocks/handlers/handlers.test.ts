@@ -12,7 +12,7 @@ import type {
 } from '@/api/types'
 import { vnDayRange, vnDay } from '@/lib/dates'
 import { type DemoEmail, signInAs } from '@/test/render'
-import { db } from '../db'
+import { db, findUserByEmail } from '../db'
 
 const fail = (promise: Promise<unknown>) =>
   promise.then(
@@ -300,5 +300,93 @@ describe('mock API: commissions, payouts, products, staff', () => {
 
     signInAs('ctv1@demo.vn')
     expect((await fail(apiRequest('/staff'))).status).toBe(403)
+  })
+})
+
+describe('mock API: pipeline actions (M3)', () => {
+  const lead = (status: Lead['status']) => db.leads.find((l) => l.status === status)!
+  const patchStatus = (id: string, body: object) =>
+    apiRequest<Lead>(`/leads/${id}/status`, { method: 'PATCH', body })
+
+  it('rejects a skipped step with 409 INVALID_TRANSITION listing the next steps', async () => {
+    signInAs('staff@demo.vn')
+    const error = await fail(patchStatus(lead('NEW').id, { status: 'APPROVED' }))
+    expect(error).toMatchObject({ status: 409, code: 'INVALID_TRANSITION' })
+    expect(error.message).toContain('CONTACTED, REJECTED')
+  })
+
+  it('requires disbursedAmount for DISBURSED and refuses it otherwise', async () => {
+    signInAs('staff@demo.vn')
+    const approved = lead('APPROVED')
+    expect((await fail(patchStatus(approved.id, { status: 'DISBURSED' }))).status).toBe(400)
+    const extra = await fail(
+      patchStatus(lead('NEW').id, { status: 'CONTACTED', disbursedAmount: 1 }),
+    )
+    expect(extra.details[0]?.field).toBe('disbursedAmount')
+
+    const done = await patchStatus(approved.id, {
+      status: 'DISBURSED',
+      disbursedAmount: 40_000_000,
+    })
+    expect(done).toMatchObject({ status: 'DISBURSED', disbursedAmount: 40_000_000 })
+  })
+
+  it('lets only staff and admins act on leads', async () => {
+    signInAs('ctv1@demo.vn')
+    const mine = db.leads.find(
+      (l) => l.affiliateId === findUserByEmail('ctv1@demo.vn')!.id && l.status === 'NEW',
+    )!
+    expect((await fail(patchStatus(mine.id, { status: 'CONTACTED' }))).status).toBe(403)
+    expect(
+      (await fail(apiRequest(`/leads/${mine.id}/notes`, { method: 'POST', body: { note: 'x' } })))
+        .status,
+    ).toBe(403)
+  })
+
+  it('assigns only to active staff/admins, and re-assigning is a no-op', async () => {
+    signInAs('admin@demo.vn')
+    const target = lead('NEW')
+    const staff = findUserByEmail('staff@demo.vn')!
+    const affiliate = findUserByEmail('ctv1@demo.vn')!
+    const assign = (staffId: string) =>
+      apiRequest<Lead>(`/leads/${target.id}/assign`, { method: 'PATCH', body: { staffId } })
+
+    expect(await fail(assign(affiliate.id))).toMatchObject({
+      status: 422,
+      code: 'ASSIGNEE_NOT_STAFF',
+    })
+    await assign(staff.id)
+    const count = () => db.activities.filter((a) => a.leadId === target.id).length
+    const before = count()
+    expect((await assign(staff.id)).assignedStaff?.id).toBe(staff.id)
+    expect(count()).toBe(before)
+  })
+
+  it('validates products and keeps commission values in range', async () => {
+    signInAs('admin@demo.vn')
+    const error = await fail(
+      apiRequest('/products', {
+        method: 'POST',
+        body: {
+          name: 'X',
+          partnerName: 'Y',
+          category: 'LOAN',
+          commissionType: 'PERCENT',
+          commissionValue: 20_000,
+        },
+      }),
+    )
+    expect(error.details[0]?.field).toBe('commissionValue')
+
+    signInAs('staff@demo.vn')
+    expect((await fail(apiRequest('/products', { method: 'POST', body: {} }))).status).toBe(403)
+  })
+
+  it('does not let an admin disable themselves', async () => {
+    const admin = signInAs('admin@demo.vn')
+    const error = await fail(
+      apiRequest(`/users/${admin.id}`, { method: 'PATCH', body: { status: 'DISABLED' } }),
+    )
+    expect(error.status).toBe(422)
   })
 })

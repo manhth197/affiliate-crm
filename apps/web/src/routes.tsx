@@ -5,12 +5,14 @@ import { NotFoundScreen } from '@/components/status-screens'
 import { AuthLayout } from '@/features/auth/auth-layout'
 import { LoginPage } from '@/features/auth/login-page'
 import { RegisterPage } from '@/features/auth/register-page'
+import { ProductsPage } from '@/features/catalog/products-page'
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { CommissionsPage } from '@/features/finance/commissions-page'
 import { PayoutsPage } from '@/features/finance/payouts-page'
 import { LeadCreatePage } from '@/features/leads/lead-create-page'
 import { LeadDetailPage } from '@/features/leads/lead-detail-page'
-import { LeadsPage } from '@/features/leads/leads-page'
+import { LeadsRoute } from '@/features/leads/leads-route'
+import { UsersPage } from '@/features/users/users-page'
 import { PlaceholderPage } from '@/pages/placeholder-page'
 import { RouteErrorPage } from '@/pages/route-error-page'
 
@@ -42,7 +44,7 @@ export const routes: RouteObject[] = [
             element: <AppLayout />,
             children: [
               { index: true, element: <DashboardPage /> },
-              { path: 'leads', element: <LeadsPage /> },
+              { path: 'leads', element: <LeadsRoute /> },
               {
                 element: <RequireRole roles={['AFFILIATE']} />,
                 children: [{ path: 'leads/new', element: <LeadCreatePage /> }],
@@ -58,8 +60,8 @@ export const routes: RouteObject[] = [
               {
                 element: <RequireRole roles={['ADMIN']} />,
                 children: [
-                  { path: 'products', element: <PlaceholderPage title="Sản phẩm" /> },
-                  { path: 'users', element: <PlaceholderPage title="Người dùng" /> },
+                  { path: 'products', element: <ProductsPage /> },
+                  { path: 'users', element: <UsersPage /> },
                 ],
               },
               {

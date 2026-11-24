@@ -4,6 +4,7 @@ import type {
   LeadStatus,
   PayoutStatus,
   ProductCategory,
+  UserStatus,
 } from '@/api/types'
 import { formatVnd } from './format'
 
@@ -43,4 +44,9 @@ export function describeCommission(type: CommissionType, value: number): string 
     return `${percentFormat.format(value / 100)}% số tiền giải ngân`
   }
   return `${formatVnd(value)} / hồ sơ thành công`
+}
+
+export const USER_STATUS_LABELS: Record<UserStatus, string> = {
+  ACTIVE: 'Hoạt động',
+  DISABLED: 'Đã khóa',
 }

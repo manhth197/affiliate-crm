@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateTime, formatVnd } from '@/lib/format'
+import { LeadActionsCard } from './lead-actions-card'
 import { LeadStatusStepper } from './lead-status-stepper'
 import { LeadTimeline } from './lead-timeline'
 import { useLead, useLeadActivities } from './queries'
@@ -83,24 +84,30 @@ export function LeadDetailPage() {
           <LeadInfoCard lead={data} backOffice={backOffice} />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Lịch sử xử lý</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activities.isError ? (
-              <QueryErrorAlert error={activities.error} onRetry={() => void activities.refetch()} />
-            ) : activities.isPending ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }, (_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : (
-              <LeadTimeline activities={activities.data} partnerName={data.product.partnerName} />
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {backOffice && <LeadActionsCard lead={data} />}
+          <Card>
+            <CardHeader>
+              <CardTitle>Lịch sử xử lý</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activities.isError ? (
+                <QueryErrorAlert
+                  error={activities.error}
+                  onRetry={() => void activities.refetch()}
+                />
+              ) : activities.isPending ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <LeadTimeline activities={activities.data} partnerName={data.product.partnerName} />
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </>
   )
