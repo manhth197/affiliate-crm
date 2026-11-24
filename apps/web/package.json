@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "build:mock": "tsc -b && vite build --mode mock",
     "preview": "vite preview",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b . e2e",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

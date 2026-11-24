@@ -18,6 +18,8 @@ ARG VITE_API_URL=/api/v1
 ARG VITE_SOCKET_URL=
 ENV VITE_API_URL=${VITE_API_URL} \
     VITE_SOCKET_URL=${VITE_SOCKET_URL}
+# e2e/ is not in the build context (.dockerignore), so nothing here may depend on it: the root
+# tsconfig.json references only the app and node projects (e2e is type-checked by `typecheck`).
 RUN npm run build
 
 # 2. Serve it. The official image renders /etc/nginx/templates/*.template with envsubst at start.
