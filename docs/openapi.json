@@ -863,8 +863,7 @@
             "in": "query",
             "description": "A staff user id, or `none` for leads nobody has been assigned.",
             "schema": {
-              "format": "uuid",
-              "example": "none",
+              "pattern": "^(none|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
               "type": "string"
             }
           },
@@ -1097,8 +1096,7 @@
             "in": "query",
             "description": "A staff user id, or `none` for leads nobody has been assigned.",
             "schema": {
-              "format": "uuid",
-              "example": "none",
+              "pattern": "^(none|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
               "type": "string"
             }
           },
@@ -1673,6 +1671,633 @@
         ]
       }
     },
+    "/api/v1/commissions": {
+      "get": {
+        "description": "Affiliates only see their own (affiliateId is ignored).",
+        "operationId": "Commissions_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/CommissionStatus"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "required": false,
+            "in": "query",
+            "description": "Ignored for affiliates (they only see their own commissions).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Month the commission was created, Vietnam calendar.",
+            "schema": {
+              "example": "2026-11",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedCommissions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List commissions",
+        "tags": [
+          "commissions"
+        ]
+      }
+    },
+    "/api/v1/commissions/summary": {
+      "get": {
+        "operationId": "Commissions_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommissionSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Commission totals for the logged-in affiliate",
+        "tags": [
+          "commissions"
+        ]
+      }
+    },
+    "/api/v1/commissions/{id}/approve": {
+      "patch": {
+        "operationId": "Commissions_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Commission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a PENDING commission (admin)",
+        "tags": [
+          "commissions"
+        ]
+      }
+    },
+    "/api/v1/commissions/{id}/cancel": {
+      "patch": {
+        "description": "Allowed for PENDING or APPROVED commissions not yet in a payout.",
+        "operationId": "Commissions_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelCommissionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Commission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a commission (admin)",
+        "tags": [
+          "commissions"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "Notifications_list",
+        "parameters": [
+          {
+            "name": "unread",
+            "required": false,
+            "in": "query",
+            "description": "true: only unread notifications.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": true,
+            "in": "query",
+            "description": "Items per page (max 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedNotifications"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My notifications, newest first",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "patch": {
+        "operationId": "Notifications_markAllRead",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark all my notifications as read",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "patch": {
+        "operationId": "Notifications_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark one notification as read (owner)",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/webhooks/partner-status": {
+      "post": {
+        "description": "X-Signature = hex HMAC-SHA256 of `${X-Timestamp}.${rawBody}` with the partner secret. Timestamps older than 5 minutes are rejected. A repeated eventId returns {ok: true, duplicate: true}.",
+        "operationId": "Webhooks_partnerStatus",
+        "parameters": [
+          {
+            "name": "X-Signature",
+            "in": "header",
+            "description": "Hex HMAC-SHA256",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Timestamp",
+            "in": "header",
+            "description": "Unix time in seconds",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Partner-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "an-phat"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerStatusWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lead status update pushed by a partner (signed)",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "Health_check",
@@ -1797,9 +2422,8 @@
         "properties": {
           "phone": {
             "type": "string",
-            "description": "VN mobile number. \"+84\", spaces and dots are accepted and normalised to 0XXXXXXXXX.",
-            "example": "0912345678",
-            "pattern": "^0[35789]\\d{8}$"
+            "description": "Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).",
+            "example": "+84 912 345 678"
           },
           "email": {
             "type": "string",
@@ -2098,8 +2722,8 @@
         "properties": {
           "phone": {
             "type": "string",
-            "example": "0987654321",
-            "pattern": "^0[35789]\\d{8}$"
+            "description": "Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).",
+            "example": "+84 912 345 678"
           },
           "role": {
             "enum": [
@@ -2147,8 +2771,8 @@
           },
           "phone": {
             "type": "string",
-            "example": "0987654321",
-            "pattern": "^0[35789]\\d{8}$"
+            "description": "Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).",
+            "example": "+84 912 345 678"
           },
           "fullName": {
             "type": "string",
@@ -2519,8 +3143,8 @@
           },
           "customerPhone": {
             "type": "string",
-            "example": "0987654321",
-            "pattern": "^0[35789]\\d{8}$"
+            "description": "Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX (10 digits, prefix 03/05/07/08/09).",
+            "example": "+84 912 345 678"
           },
           "customerName": {
             "type": "string",
@@ -2686,6 +3310,279 @@
           "assignee",
           "createdAt",
           "note"
+        ]
+      },
+      "CommissionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "PAID",
+          "CANCELLED"
+        ]
+      },
+      "CommissionLead": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "example": "LD-000123"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Hoàng Thị Mai"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "customerName"
+        ]
+      },
+      "Commission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommissionStatus"
+              }
+            ]
+          },
+          "payoutId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lead": {
+            "$ref": "#/components/schemas/CommissionLead"
+          },
+          "affiliate": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "amount": {
+            "type": "number",
+            "description": "VND",
+            "example": 750000
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "payoutId",
+          "createdAt",
+          "lead",
+          "affiliate",
+          "amount"
+        ]
+      },
+      "PaginatedCommissions": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Commission"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "CommissionSummary": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "number",
+            "example": 750000
+          },
+          "approved": {
+            "type": "number"
+          },
+          "paid": {
+            "type": "number"
+          },
+          "totalLeads": {
+            "type": "number"
+          },
+          "disbursedLeads": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pending",
+          "approved",
+          "paid",
+          "totalLeads",
+          "disbursedLeads"
+        ]
+      },
+      "CancelCommissionRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Khách hàng huỷ hợp đồng trong 15 ngày",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "NotificationType": {
+        "type": "string",
+        "enum": [
+          "LEAD_STATUS_CHANGED",
+          "COMMISSION_CREATED",
+          "PAYOUT_PAID",
+          "LEAD_ASSIGNED"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationType"
+              }
+            ]
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Flat string map, e.g. { \"leadId\": \"…\", \"status\": \"APPROVED\" }.",
+            "example": {
+              "leadId": "0190…",
+              "leadCode": "LD-000123",
+              "status": "APPROVED"
+            }
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "title": {
+            "type": "string",
+            "example": "Lead LD-000123: Đã duyệt"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "data",
+          "readAt",
+          "createdAt",
+          "title",
+          "body"
+        ]
+      },
+      "PaginatedNotifications": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          },
+          "unreadCount": {
+            "type": "number",
+            "description": "Unread notifications of the user (all pages)."
+          }
+        },
+        "required": [
+          "data",
+          "meta",
+          "unreadCount"
+        ]
+      },
+      "PartnerStatusWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "APPROVED",
+              "REJECTED",
+              "DISBURSED"
+            ],
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string",
+            "description": "Partner's unique id for this event; repeats are acknowledged, not re-applied.",
+            "maxLength": 100
+          },
+          "leadCode": {
+            "type": "string",
+            "example": "LD-000123",
+            "pattern": "^LD-\\d{6,9}$"
+          },
+          "disbursedAmount": {
+            "type": "number",
+            "description": "VND; required when status is DISBURSED.",
+            "minimum": 0,
+            "maximum": 100000000000
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "status",
+          "eventId",
+          "leadCode"
+        ]
+      },
+      "WebhookAck": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "description": "true when this eventId was already processed (nothing changed)."
+          }
+        },
+        "required": [
+          "ok"
         ]
       },
       "Health": {

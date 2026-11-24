@@ -20,6 +20,19 @@ export function normalizeVnPhone(raw: string): string {
   return compact;
 }
 
+/**
+ * Swagger docs for phone inputs. No `pattern`: the regex applies after
+ * normalisation, so publishing it would reject input the API accepts.
+ */
+export const VN_PHONE_API_PROPERTY = {
+  type: String,
+  description:
+    'Vietnamese mobile number. Accepted as 0XXXXXXXXX, +84XXXXXXXXX or 84XXXXXXXXX; ' +
+    'spaces, dots, dashes and parentheses are ignored. Stored and returned as 0XXXXXXXXX ' +
+    '(10 digits, prefix 03/05/07/08/09).',
+  example: '+84 912 345 678',
+} as const;
+
 /** DTO property decorator: normalise, then validate as a VN mobile number. */
 export function IsVnPhone(): PropertyDecorator {
   return applyDecorators(

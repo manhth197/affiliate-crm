@@ -4,15 +4,20 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { CommissionsModule } from './commissions/commissions.module';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { LeadsModule } from './leads/leads.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
+import { QueuesModule } from './queues/queues.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -24,11 +29,16 @@ import { UsersModule } from './users/users.module';
     EventEmitterModule.forRoot(),
     PrismaModule,
     RedisModule,
+    QueuesModule,
     AuditModule,
     AuthModule,
     UsersModule,
     ProductsModule,
     LeadsModule,
+    CommissionsModule,
+    NotificationsModule,
+    RealtimeModule,
+    WebhooksModule,
     HealthModule,
   ],
   providers: [

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
+import type { Prisma } from '../generated/prisma/client';
 import { LeadActivityType, LeadStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatLeadCode } from './lead-code';
@@ -40,7 +41,15 @@ export class LeadStatusService {
     private readonly events: EventEmitter2,
   ) {}
 
-  async changeStatus(request: StatusChangeRequest): Promise<LeadWithRelations> {
+  /**
+   * @param inTransaction optional extra write that must commit or roll back
+   *   together with the status change (the webhook stores its event id here,
+   *   so a failed change leaves no "already processed" marker behind).
+   */
+  async changeStatus(
+    request: StatusChangeRequest,
+    inTransaction?: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<LeadWithRelations> {
     const { leadId, to, source } = request;
     if (to === LeadStatus.DISBURSED && request.disbursedAmount === undefined) {
       throw unprocessable(
@@ -51,6 +60,7 @@ export class LeadStatusService {
     const actorId = source.kind === 'user' ? source.userId : null;
 
     const { lead, from } = await this.prisma.$transaction(async (tx) => {
+      await inTransaction?.(tx);
       const current = await tx.lead.findUnique({
         where: { id: leadId },
         select: { status: true },
