@@ -1,5 +1,6 @@
 import type { INestApplication, NestApplicationOptions } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
 import {
   DocumentBuilder,
   type OpenAPIObject,
@@ -23,8 +24,13 @@ export function configureApp(app: INestApplication): void {
     .map((origin) => origin.trim())
     .filter(Boolean);
   app.setGlobalPrefix(API_PREFIX);
+  // Reads the crm_rt refresh-token cookie into request.cookies.
+  app.use(cookieParser());
   app.enableCors({
     origin: origins,
+    // Lets the web app send the refresh-token cookie; only ever for the
+    // configured origins above (never with a wildcard).
+    credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
     // Lets the browser read the file name of the CSV export.
@@ -44,6 +50,17 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
     )
     .setVersion('0.1.0')
     .addBearerAuth()
+    .addCookieAuth(
+      'crm_rt',
+      {
+        type: 'apiKey',
+        in: 'cookie',
+        name: 'crm_rt',
+        description:
+          'httpOnly refresh-token cookie (set by login/register/refresh)',
+      },
+      'refreshCookie',
+    )
     .build();
   return SwaggerModule.createDocument(app, config, {
     // "AuthController.login" -> "Auth_login"

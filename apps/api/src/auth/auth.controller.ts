@@ -1,17 +1,23 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   Patch,
   Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UnsupportedMediaTypeException,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -20,8 +26,10 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  ApiUnsupportedMediaTypeResponse,
 } from '@nestjs/swagger';
 import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
 import { ErrorResponseDto } from '../common/errors/error-response.dto';
 import { MeDto } from '../users/dto/user.dto';
 import type { AuthUser } from './auth.types';
@@ -33,6 +41,19 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import {
+  isJsonRequest,
+  REFRESH_COOKIE,
+  resolveRefreshToken,
+} from './refresh-cookie';
+import { RefreshCookieService } from './refresh-cookie.service';
+
+const SET_COOKIE_HEADER = {
+  'Set-Cookie': {
+    description: `${REFRESH_COOKIE}=<refresh token>; HttpOnly; SameSite=Strict; Path=/api/v1/auth; Max-Age=604800 (+ Secure in production)`,
+    schema: { type: 'string' },
+  },
+};
 
 @ApiTags('auth')
 @Controller('auth')
@@ -43,26 +64,34 @@ import { UpdateMeDto } from './dto/update-me.dto';
   description: 'Rate limit exceeded',
 })
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly cookies: RefreshCookieService,
+  ) {}
 
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register an affiliate account' })
-  @ApiCreatedResponse({ type: AuthResponseDto })
+  @ApiCreatedResponse({ type: AuthResponseDto, headers: SET_COOKIE_HEADER })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiConflictResponse({
     type: ErrorResponseDto,
     description: 'Email already registered',
   })
-  register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
-    return this.auth.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.auth.register(dto);
+    this.cookies.set(response, result.refreshToken);
+    return result;
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Log in with email and password' })
-  @ApiOkResponse({ type: AuthResponseDto })
+  @ApiOkResponse({ type: AuthResponseDto, headers: SET_COOKIE_HEADER })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({
     type: ErrorResponseDto,
@@ -72,42 +101,92 @@ export class AuthController {
     type: ErrorResponseDto,
     description: 'Account is disabled',
   })
-  login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
-    return this.auth.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponseDto> {
+    const result = await this.auth.login(dto);
+    this.cookies.set(response, result.refreshToken);
+    return result;
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiCookieAuth('refreshCookie')
   @ApiOperation({
     summary: 'Exchange a refresh token for a new token pair',
     description:
-      'Refresh tokens are single use. Reusing an old one revokes the whole session (401).',
+      'Uses `refreshToken` from the body if present (deprecated), otherwise the `crm_rt` cookie; cookie calls must be `Content-Type: application/json`. ' +
+      'Refresh tokens are single use: reusing an old one revokes the whole session (401). On 401/403 the cookie is cleared.',
   })
-  @ApiOkResponse({ type: TokenPairDto })
+  @ApiOkResponse({ type: TokenPairDto, headers: SET_COOKIE_HEADER })
   @ApiUnauthorizedResponse({
     type: ErrorResponseDto,
-    description: 'Invalid, expired or reused refresh token',
+    description: 'Missing, invalid, expired or reused refresh token',
   })
   @ApiForbiddenResponse({
     type: ErrorResponseDto,
     description: 'Account is disabled',
   })
-  refresh(@Body() dto: RefreshTokenDto): Promise<TokenPairDto> {
-    return this.auth.refresh(dto.refreshToken);
+  @ApiUnsupportedMediaTypeResponse({
+    type: ErrorResponseDto,
+    description: 'Cookie call without Content-Type: application/json',
+  })
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TokenPairDto> {
+    const { token, fromCookie } = resolveRefreshToken(
+      dto.refreshToken,
+      request,
+    );
+    if (fromCookie && token && !isJsonRequest(request)) {
+      throw new UnsupportedMediaTypeException(
+        'Cookie-based refresh requires Content-Type: application/json',
+      );
+    }
+    if (!token) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    try {
+      const pair = await this.auth.refresh(token);
+      this.cookies.set(response, pair.refreshToken);
+      return pair;
+    } catch (error) {
+      // A dead token should not keep being sent by the browser.
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
+        this.cookies.clear(response);
+      }
+      throw error;
+    }
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Revoke a refresh token (end this session)' })
+  @ApiOperation({
+    summary: 'End this session',
+    description:
+      'Revokes the refresh token from the body (deprecated) or the `crm_rt` cookie, and always clears the cookie.',
+  })
   @ApiNoContentResponse()
   @ApiUnauthorizedResponse({ type: ErrorResponseDto })
-  logout(
+  async logout(
     @CurrentUser() user: AuthUser,
     @Body() dto: RefreshTokenDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    return this.auth.logout(user.id, dto.refreshToken);
+    const { token } = resolveRefreshToken(dto.refreshToken, request);
+    if (token) {
+      await this.auth.logout(user.id, token);
+    }
+    this.cookies.clear(response);
   }
 
   @Get('me')

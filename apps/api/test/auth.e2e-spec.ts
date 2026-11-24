@@ -316,18 +316,25 @@ describe('Auth (e2e)', () => {
         .expect(200);
     });
 
-    it('rejects an unknown token and an empty body', async () => {
+    it('rejects an unknown token, an empty body without cookie, and a malformed token', async () => {
       await ctx
         .http()
         .post(`${API}/auth/refresh`)
         .send({ refreshToken: 'made-up-token' })
         .expect(401);
-      const res = await ctx
+      // v0.6: the body token is optional (the cookie is the fallback).
+      const empty = await ctx
         .http()
         .post(`${API}/auth/refresh`)
         .send({})
+        .expect(401);
+      expect(empty.body.message).toBe('Missing refresh token');
+      const malformed = await ctx
+        .http()
+        .post(`${API}/auth/refresh`)
+        .send({ refreshToken: 123 })
         .expect(400);
-      expect(res.body.details[0].field).toBe('refreshToken');
+      expect(malformed.body.details[0].field).toBe('refreshToken');
     });
 
     it('refuses to refresh once the account is disabled', async () => {
